@@ -185,7 +185,7 @@ function Preview() {
                     {!agentDetails?.agentToolConfig ? <div className='flex items-center justify-center h-full'><Button onClick={GenerateAgentToolConfig} disabled={loading}>
                         <RefreshCcwIcon className={`${loading && 'animate-spin'}`} />
                         Reboot Agent
-                    </Button></div> : <ChatUI GenerateAgentToolConfig={GenerateAgentToolConfig} loading={loading} />}
+                    </Button></div> : <ChatUI GenerateAgentToolConfig={GenerateAgentToolConfig} loading={loading} agentDetails={agentDetails} />}
 
                 </div>
             </div>

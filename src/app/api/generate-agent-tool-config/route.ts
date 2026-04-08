@@ -1,49 +1,116 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const PROMPT = `
-From this flow, generate a complete agent configuration in JSON format.
+const PROMPT = `You are a strict JSON generator.
 
-Rules:
-- Return ONLY valid JSON
-- No explanation, no markdown, no extra text
-- Follow exact structure
+Your task:
+Convert the given flow into a VALID agent configuration.
 
-Structure:
+---
+
+RULES:
+
+1. Output ONLY valid JSON
+2. NO explanation, NO markdown
+3. DO NOT change structure
+4. DO NOT invent fields
+
+---
+
+STRUCTURE:
+
 {
-  "systemPrompt": "",
-  "primaryAgentName": "",
-  "agents": [
-    {
-      "id": "agent-id",
-      "name": "",
-      "model": "",
-      "includeHistory": true,
-      "output": "",
-      "tools": [
-        {
-          "toolId": "",
-          "instruction": ""
-        }
-      ]
-    }
-  ],
-  "tools": [
-    {
-      "id": "",
-      "name": "",
-      "description": "",
-      "method": "GET",
-      "url": "",
-      "includeApikey": true,
-      "apiKey": "",
-      "parameters": {
-        "key": "dataType"
-      },
-      "usage": [],
-      "assignedAgent": ""
-    }
-  ]
+"systemPrompt": "",
+"primaryAgentName": "",
+"agents": [
+{
+"id": "",
+"name": "",
+"model": "",
+"includeHistory": true,
+"output": "text",
+"tools": [
+{
+"toolId": "",
+"instruction": ""
 }
+]
+}
+],
+"tools": [
+{
+"id": "",
+"name": "",
+"description": "",
+"method": "GET",
+"url": "",
+"includeApikey": true,
+"apiKey": "",
+"parameters": {},
+"usage": [],
+"assignedAgent": ""
+}
+]
+}
+
+---
+
+DYNAMIC PARAMETER RULES (IMPORTANT):
+
+* Identify ALL placeholders in the URL.
+* Placeholders are inside {}.
+
+Example:
+URL → /api/user?id={userId}&type={userType}
+
+Then parameters MUST be:
+{
+"userId": "string",
+"userType": "string"
+}
+
+---
+
+STRICT RULES:
+
+* Parameter names MUST EXACTLY match URL placeholders
+* DO NOT use generic names like "key", "data", "value"
+* DO NOT hardcode parameter names
+* DO NOT guess — only extract from URL
+
+---
+
+API KEY RULES:
+
+* apiKey must NOT be inside parameters
+* apiKey must ONLY be in tools.apiKey
+* includeApikey controls whether key is used
+
+---
+
+TOOL RULES:
+
+* Full tool definition ONLY inside "tools"
+* agents.tools contains ONLY:
+  { "toolId": "", "instruction": "" }
+
+---
+
+AGENT RULES:
+
+* primaryAgentName must match an agent name
+* Each tool must have assignedAgent
+* Agents reference tools using toolId only
+
+---
+
+INPUT:
+{{FLOW_JSON}}
+
+---
+
+OUTPUT:
+Return ONLY valid JSON.
+
 `;
 
 async function callModel(model: string, input: string) {
@@ -77,8 +144,8 @@ export async function POST(req: NextRequest) {
   const { jsonConfig } = await req.json();
 
   const models = [
-    "openrouter/free",
     "mistralai/mistral-7b-instruct",
+    "openrouter/free",
     "deepseek/deepseek-chat"
   ];
 
