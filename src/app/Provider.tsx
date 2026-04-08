@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react'
 import { api } from '../../convex/_generated/api';
 import { UserDetailContext } from '@/context/UserDetailContext';
 import { WorkflowContext } from '@/context/WorkflowContext';
+import { ReactFlowProvider } from '@xyflow/react';
 
 function Provider({
     children,
@@ -14,14 +15,16 @@ function Provider({
     const { user } = useUser();
     const createUser = useMutation(api.user.CreateNewUser);
     const [userDetail, setUserDetail] = useState<any>()
+    const [selectedNode, setSelectedNode] = useState<any>();
     const [addedNodes, setAddedNodes] = useState([{
         id: "Start",
-        position: {x: 0, y: 0},
-        data: {label: 'Start'},
+        deletable: false,
+        position: { x: 0, y: 0 },
+        data: { label: 'Start' },
         type: "StartNode"
     }])
 
-    const [nodeEdges,setNodeEdges] = useState([])
+    const [nodeEdges, setNodeEdges] = useState([])
     useEffect(() => {
         user && CreateAndGetUser();
     }, [user])
@@ -38,11 +41,13 @@ function Provider({
     }
     return (
         <UserDetailContext.Provider value={{ userDetail, setUserDetail }}>
-            <WorkflowContext.Provider value={{addedNodes, setAddedNodes,nodeEdges,setNodeEdges}}>
-                <div>
-                    {children}
-                </div>
-            </WorkflowContext.Provider>
+            <ReactFlowProvider>
+                <WorkflowContext.Provider value={{ addedNodes, setAddedNodes, nodeEdges, setNodeEdges, selectedNode, setSelectedNode }}>
+                    <div>
+                        {children}
+                    </div>
+                </WorkflowContext.Provider>
+            </ReactFlowProvider>
         </UserDetailContext.Provider>
     )
 }

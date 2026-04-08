@@ -4,6 +4,7 @@ import { Outfit } from 'next/font/google'
 import { ConvexClientProvider } from "./ConvexClientProvider";
 import { ClerkProvider } from "@clerk/nextjs";
 import Provider from "./Provider";
+import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: "AgentStudio",
@@ -26,6 +27,7 @@ export default function RootLayout({
           <ConvexClientProvider>
             <Provider>
               {children}
+              <Toaster/>
             </Provider>
           </ConvexClientProvider>
         </body>

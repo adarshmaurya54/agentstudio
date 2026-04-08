@@ -5,7 +5,8 @@ import {
   GitBranch,
   RefreshCcw,
   ShieldCheck,
-  Globe
+  Globe,
+  Play
 } from 'lucide-react';
 import { useContext } from 'react';
 
@@ -60,7 +61,7 @@ function AiAgentToolsPanel() {
     const newNode = {
       id: `${tools.id}-${Date.now()}`,
       position: {x: 0, y: 100},
-      data: {label: tools.name, ...tools},
+      data: {label: tools.name, bgColor: tools.bgColor, type: tools.type, id: tools.id},
       type: tools.type
     }
     setAddedNodes((prev: any) => [...prev, newNode]);

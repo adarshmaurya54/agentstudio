@@ -1,7 +1,7 @@
 'use client'
 import Header from '../_components/Header'
 import { useState, useCallback, useContext, useEffect } from 'react';
-import { ReactFlow, applyNodeChanges, applyEdgeChanges, addEdge, Background, Controls, MiniMap, Panel } from '@xyflow/react';
+import { ReactFlow, applyNodeChanges, applyEdgeChanges, addEdge, Background, Controls, MiniMap, Panel, useOnSelectionChange, OnSelectionChangeParams } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import StartNode from '../_customNodes/StartNode';
 import AgentNode from '../_customNodes/AgentNode';
@@ -12,14 +12,26 @@ import { api } from '../../../../convex/_generated/api';
 import { useParams } from 'next/navigation';
 import { Agent } from '@/types/agentTypes';
 import { Id } from '../../../../convex/_generated/dataModel';
+import { toast } from 'sonner';
+import EndNode from '../_customNodes/EndNode';
+import IfElseNode from '../_customNodes/IfElseNode';
+import WhileNode from '../_customNodes/WhileNode';
+import ApprovalNode from '../_customNodes/ApprovalNode';
+import ApiNode from '../_customNodes/ApiNode';
+import SettingPanel from '../_components/SettingPanel';
 
-const nodeTypes = {
+export const nodeTypes = {
     StartNode: StartNode,
-    AgentNode: AgentNode
+    AgentNode: AgentNode,
+    EndNode: EndNode,
+    IfElseNode: IfElseNode,
+    WhileNode: WhileNode,
+    ApprovalNode: ApprovalNode,
+    ApiNode: ApiNode
 };
 
 function AgentBuilder() {
-    const { addedNodes, setAddedNodes, nodeEdges, setNodeEdges } = useContext(WorkflowContext);
+    const { addedNodes, setAddedNodes, nodeEdges, setNodeEdges, setSelectedNode } = useContext(WorkflowContext);
     const { agentId } = useParams();
     const nodes = addedNodes;
     const edges = nodeEdges;
@@ -31,7 +43,7 @@ function AgentBuilder() {
     const convex = useConvex();
     const updateAgentDetails = useMutation(api.agent.updateAgentDetail);
 
-    // 🔹 Load initial data
+    // Load initial data
     useEffect(() => {
         GetAgentDetails();
     }, []);
@@ -43,12 +55,12 @@ function AgentBuilder() {
 
         setAgentDetails(result);
 
-        // ✅ Load into draft state
-        setAddedNodes(result?.nodes || []);
-        setNodeEdges(result?.edges || []);
+        // Load into draft state
+        setAddedNodes(result?.nodes || nodes);
+        setNodeEdges(result?.edges || edges);
     };
 
-    // 🔹 Track unsaved changes
+    // Track unsaved changes
     useEffect(() => {
         setIsDirty(true);
     }, [nodes, edges]);
@@ -63,16 +75,23 @@ function AgentBuilder() {
                 id: node.id,
                 type: node.type,
                 position: node.position,
+                deletable: node.deletable ?? true,
                 data: {
-                    label: node.data?.label ?? ""
+                    ...node.data,
+                    label: node.data?.label ?? "",
+                    bgColor: node.data?.bgColor ?? "",
+                    type: node.data?.type ?? "",
+                    id: node.data?.id ?? ""
                 }
             }));
 
             const cleanEdges = edges.map((edge: any) => ({
                 id: edge.id,
                 source: edge.source,
+                sourceHandle: edge.sourceHandle ?? null,   
                 target: edge.target,
-                type: edge.type
+                targetHandle: edge.targetHandle ?? null,   
+                type: edge.type ?? null
             }));
 
             await updateAgentDetails({
@@ -80,23 +99,24 @@ function AgentBuilder() {
                 nodes: cleanNodes,
                 edges: cleanEdges
             });
-
+            toast.success('Saved successfully!');
             setIsDirty(false);
         } catch (error) {
+            toast.error('Somthing went wrong!');
             console.error(error);
         } finally {
             setIsSaving(false);
         }
     };
 
-    // 🔹 Discard changes
+    // Discard changes
     const resetChanges = () => {
         setIsDirty(false);
         setAddedNodes(agentDetails?.nodes || []);
         setNodeEdges(agentDetails?.edges || []);
     };
 
-    // 🔹 React Flow handlers
+    // React Flow handlers
     const onNodesChange = useCallback((changes: any) => {
         setAddedNodes((prevNodes: any) =>
             applyNodeChanges(changes, prevNodes)
@@ -110,12 +130,26 @@ function AgentBuilder() {
     }, []);
 
     const onConnect = useCallback((params: any) => {
-        setNodeEdges((prevEdges: any) => addEdge(params, prevEdges));
+        console.log(params, 'on connect');
+        const edge = {
+            ...params,
+            id: `${params.source}-${params.sourceHandle}-${params.target}`,
+        };
+
+        setNodeEdges((prevEdges: any) => addEdge(edge, prevEdges));
     }, []);
-    console.log(isDirty)
+
+    const onNodeSelect = useCallback(({ nodes, edges }: OnSelectionChangeParams) => {
+        setSelectedNode(nodes[0]);
+        console.log(nodes[0]);
+    }, [])
+
+    useOnSelectionChange({
+        onChange: onNodeSelect
+    })
     return (
         <div>
-            <Header agentDetails={agentDetails} />
+            <Header agentDetails={agentDetails} previewOption={true} />
 
             <div style={{ width: '100vw', height: '100vh' }}>
                 <ReactFlow
@@ -134,6 +168,10 @@ function AgentBuilder() {
                     {/* LEFT PANEL */}
                     <Panel position="top-left" style={{ top: 55 }}>
                         <AiAgentToolsPanel />
+                    </Panel>
+                    {/* RIGHT PANEL */}
+                    <Panel position="top-right" style={{ top: 55 }}>
+                        <SettingPanel />
                     </Panel>
 
                     {/* RIGHT PANEL (SAVE CONTROLS) */}
@@ -180,13 +218,12 @@ function AgentBuilder() {
                                         ? "opacity-0 max-w-0 overflow-hidden px-0 pointer-events-none"
                                         : "opacity-100 max-w-[100px] bg-gray-100 text-gray-700 hover:bg-gray-200 active:scale-95"
                                     }
-    `}
+                                `}
                             >
                                 <span className="whitespace-nowrap">Discard</span>
                             </button>
                         </div>
                     </Panel>
-
                 </ReactFlow>
             </div>
         </div >
