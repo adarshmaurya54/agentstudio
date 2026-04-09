@@ -23,7 +23,7 @@
 //       "Content-Type": "application/json",
 //     },
 //     body: JSON.stringify({
-//       model: "deepseek/deepseek-chat",
+//       model: "openrouter/free",
 //       messages,
 //       stream: true,
 //       temperature: 0,
@@ -40,7 +40,7 @@
 //       "Content-Type": "application/json",
 //     },
 //     body: JSON.stringify({
-//       model: "deepseek/deepseek-chat",
+//       model: "openrouter/free",
 //       messages,
 //       temperature: 0,
 //     }),
@@ -298,7 +298,7 @@ async function callModelStream(messages: any[]): Promise<Response> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "deepseek/deepseek-chat",
+      model: "openrouter/free",
       messages,
       stream: true,
       temperature: 0,
@@ -325,7 +325,7 @@ async function callModel(messages: any[]): Promise<string> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "deepseek/deepseek-chat",
+      model: "openrouter/free",
       messages,
       temperature: 0,
     }),

@@ -1,22 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const PROMPT = `You are a strict JSON generator.
+const PROMPT = `
+You are a deterministic JSON compiler.
 
 Your task:
-Convert the given flow into a VALID agent configuration.
+Convert the given FLOW_JSON into a STRICT agent configuration.
 
----
+You MUST follow all rules exactly.
 
-RULES:
+--------------------------------------------------
+
+OUTPUT RULES (HIGHEST PRIORITY):
 
 1. Output ONLY valid JSON
-2. NO explanation, NO markdown
-3. DO NOT change structure
-4. DO NOT invent fields
+2. No explanation, no markdown, no text outside JSON
+3. Do NOT add, remove, or rename fields
+4. Do NOT reorder keys
+5. Follow the exact structure and key order
+6. There is ONLY ONE correct output
+7. Be fully deterministic
 
----
+--------------------------------------------------
 
-STRUCTURE:
+STRICT DEFAULT RULES:
+
+If any value is missing:
+- Use "" for strings
+- Use [] for arrays
+- Use {} for objects
+- Use true/false only if explicitly required
+
+DO NOT:
+- Skip fields
+- Invent values
+- Guess values
+- Add extra properties
+
+--------------------------------------------------
+
+STRUCTURE (FOLLOW EXACTLY):
 
 {
 "systemPrompt": "",
@@ -52,15 +74,41 @@ STRUCTURE:
 ]
 }
 
----
+--------------------------------------------------
 
-DYNAMIC PARAMETER RULES (IMPORTANT):
+FLOW INTERPRETATION RULES:
 
-* Identify ALL placeholders in the URL.
-* Placeholders are inside {}.
+- Each agent node → agents[]
+  id = node.id
+  name = node.label
+
+- primaryAgentName = first agent node name
+
+- Each tool/API node → tools[]
+  id = node.id
+  name = node.label
+  description = node.label
+  method = "GET"
+  url = node.settings.url
+
+- assignedAgent = the nearest previous agent node in flow
+
+- agents.tools:
+  Only include:
+  {
+    "toolId": tool.id,
+    "instruction": node.settings.instruction OR ""
+  }
+
+--------------------------------------------------
+
+DYNAMIC PARAMETER RULES:
+
+- Extract ALL placeholders from URL
+- Placeholders are inside {}
 
 Example:
-URL → /api/user?id={userId}&type={userType}
+"/api/user?id={userId}&type={userType}"
 
 Then parameters MUST be:
 {
@@ -68,49 +116,37 @@ Then parameters MUST be:
 "userType": "string"
 }
 
----
+STRICT:
+- Parameter names must EXACTLY match placeholders
+- Do NOT rename
+- Do NOT hardcode
+- Do NOT guess
 
-STRICT RULES:
-
-* Parameter names MUST EXACTLY match URL placeholders
-* DO NOT use generic names like "key", "data", "value"
-* DO NOT hardcode parameter names
-* DO NOT guess — only extract from URL
-
----
+--------------------------------------------------
 
 API KEY RULES:
 
-* apiKey must NOT be inside parameters
-* apiKey must ONLY be in tools.apiKey
-* includeApikey controls whether key is used
+- apiKey must NOT be inside parameters
+- apiKey must ONLY be in tools.apiKey
+- includeApikey controls usage
 
----
+--------------------------------------------------
 
-TOOL RULES:
+FINAL CONSTRAINT:
 
-* Full tool definition ONLY inside "tools"
-* agents.tools contains ONLY:
-  { "toolId": "", "instruction": "" }
+Do NOT generate multiple valid variations.
+Do NOT reinterpret structure.
+Always produce the SAME output for the SAME input.
 
----
-
-AGENT RULES:
-
-* primaryAgentName must match an agent name
-* Each tool must have assignedAgent
-* Agents reference tools using toolId only
-
----
+--------------------------------------------------
 
 INPUT:
 {{FLOW_JSON}}
 
----
+--------------------------------------------------
 
 OUTPUT:
 Return ONLY valid JSON.
-
 `;
 
 async function callModel(model: string, input: string) {
@@ -133,6 +169,7 @@ async function callModel(model: string, input: string) {
         }
       ],
       temperature: 0, // IMPORTANT for structured output
+      top_p: 0,    // IMPORTANT for structured output
       stream: false,  // IMPORTANT (no streaming)
     }),
   });

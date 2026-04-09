@@ -137,7 +137,7 @@ function Preview() {
             flow,
         };
 
-
+        console.log('Generated Config:', JSON.stringify(config));
         setConfig(config);
     }
     const GenerateAgentToolConfig = async () => {
