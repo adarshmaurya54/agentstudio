@@ -1,296 +1,60 @@
-// import { NextRequest } from "next/server";
-
-// const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-
-// // 🧠 In-memory store (replace later with DB)
-// const memoryStore = new Map<string, any[]>();
-
-// function getMemory(id: string) {
-//   return memoryStore.get(id) || [];
-// }
-
-// function updateMemory(id: string, message: any) {
-//   const prev = memoryStore.get(id) || [];
-//   memoryStore.set(id, [...prev, message]);
-// }
-
-// // 🔥 STREAM CALL
-// async function callModelStream(messages: any[]) {
-//   return fetch(OPENROUTER_URL, {
-//     method: "POST",
-//     headers: {
-//       Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-//       "Content-Type": "application/json",
-//     },
-//     body: JSON.stringify({
-//       model: "openrouter/free",
-//       messages,
-//       stream: true,
-//       temperature: 0,
-//     }),
-//   });
-// }
-
-// // 🔥 NORMAL CALL (for decision)
-// async function callModel(messages: any[]) {
-//   const res = await fetch(OPENROUTER_URL, {
-//     method: "POST",
-//     headers: {
-//       Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-//       "Content-Type": "application/json",
-//     },
-//     body: JSON.stringify({
-//       model: "openrouter/free",
-//       messages,
-//       temperature: 0,
-//     }),
-//   });
-
-//   const data = await res.json();
-//   return data?.choices?.[0]?.message?.content || "";
-// }
-
-// // 🔥 TOOL EXECUTION
-// async function executeTool(tool: any, params: any) {
-//   let url = tool.url;
-
-//   for (const key in params) {
-//     url = url.replace(`{${key}}`, encodeURIComponent(params[key]));
-//   }
-
-//   if (tool.includeApikey && tool.apiKey) {
-//     url += url.includes("?")
-//       ? `&key=${tool.apiKey}`
-//       : `?key=${tool.apiKey}`;
-//   }
-
-//   const res = await fetch(url);
-//   return res.json();
-// }
-
-// // 🔥 DECISION ENGINE (FIXED)
-// async function decideAction(input: string, tools: any[], agent: any) {
-//   const raw = await callModel([
-//     {
-//       role: "system",
-//       content: `
-// You are an AI agent.
-
-// Agent Instructions:
-// ${agent?.tools?.[0]?.instruction || ""}
-
-// Available tools:
-// ${JSON.stringify(tools)}
-
-// Your job:
-// - Understand user intent
-// - Decide whether to respond normally OR use a tool
-
-// Rules:
-// - Greeting / casual → respond normally
-// - Real-time / external data → use tool
-// - Use EXACT parameter names
-
-// Return ONLY JSON:
-
-// If tool needed:
-// {
-//   "type": "tool",
-//   "tool": "tool_name",
-//   "params": {}
-// }
-
-// If NOT needed:
-// {
-//   "type": "response",
-//   "content": "your reply"
-// }
-//       `,
-//     },
-//     { role: "user", content: input },
-//   ]);
-
-//   const cleaned = raw
-//     .replace(/```json/g, "")
-//     .replace(/```/g, "")
-//     .trim();
-
-//   try {
-//     return JSON.parse(cleaned);
-//   } catch {
-//     return null;
-//   }
-// }
-
-// export async function POST(req: NextRequest) {
-//   const { input, tools, agents, conversationId, agentName } =
-//     await req.json();
-
-//   // 🧠 1. Select agent
-//   const activeAgent =
-//     agents.find((a: any) => a.name === agentName) || agents[0];
-
-//   // 🧠 2. Filter tools (FIXED ID + fallback)
-//   const agentTools = tools.filter(
-//     (t: any) =>
-//       t.assignedAgent === activeAgent.id ||
-//       t.assignedAgent === activeAgent.name
-//   );
-
-//   // 🧠 3. Memory
-//   const memory = getMemory(conversationId);
-
-//   updateMemory(conversationId, { role: "user", content: input });
-
-//   // 🧠 4. Decide action
-//   const decision = await decideAction(input, agentTools, activeAgent);
-
-//   if (!decision) {
-//     return new Response("Failed to decide");
-//   }
-
-//   // ✅ NORMAL RESPONSE (no tool)
-//   if (decision.type === "response") {
-//     updateMemory(conversationId, {
-//       role: "assistant",
-//       content: decision.content,
-//     });
-
-//     return new Response(decision.content);
-//   }
-
-//   // ✅ TOOL FLOW
-//   let tool = agentTools.find(
-//     (t: any) =>
-//       t.name.toLowerCase() === decision.tool?.toLowerCase()
-//   );
-
-//   // 🔥 fallback matching (important)
-//   if (!tool) {
-//     tool = agentTools.find((t: any) =>
-//       t.name.toLowerCase().includes(decision.tool?.toLowerCase())
-//     );
-//   }
-
-//   if (!tool) {
-//     return new Response("Tool not found");
-//   }
-
-//   // ⚙️ Execute tool
-//   const toolResult = await executeTool(tool, decision.params);
-
-//   // 🔥 STREAM FINAL RESPONSE
-//   const streamRes = await callModelStream([
-//     ...memory,
-//     {
-//       role: "system",
-//       content:
-//         activeAgent?.tools?.[0]?.instruction ||
-//         "Respond clearly to the user.",
-//     },
-//     {
-//       role: "user",
-//       content: `
-// User asked: ${input}
-// Tool result: ${JSON.stringify(toolResult)}
-//       `,
-//     },
-//   ]);
-
-//   const reader = streamRes.body?.getReader();
-//   const encoder = new TextEncoder();
-//   const decoder = new TextDecoder();
-
-//   let fullText = "";
-
-//   const stream = new ReadableStream({
-//     async start(controller) {
-//       while (true) {
-//         const { done, value } = await reader!.read();
-//         if (done) break;
-
-//         const chunk = decoder.decode(value);
-//         const lines = chunk.split("\n");
-
-//         for (const line of lines) {
-//           if (line.startsWith("data: ")) {
-//             const json = line.replace("data: ", "").trim();
-
-//             if (json === "[DONE]") {
-//               updateMemory(conversationId, {
-//                 role: "assistant",
-//                 content: fullText,
-//               });
-
-//               controller.close();
-//               return;
-//             }
-
-//             try {
-//               const parsed = JSON.parse(json);
-//               const content =
-//                 parsed?.choices?.[0]?.delta?.content || "";
-
-//               if (content) {
-//                 fullText += content;
-//                 controller.enqueue(encoder.encode(content));
-//               }
-//             } catch {}
-//           }
-//         }
-//       }
-
-//       controller.close();
-//     },
-//   });
-
-//   return new Response(stream, {
-//     headers: {
-//       "Content-Type": "text/plain",
-//     },
-//   });
-// }
-
-// // 🔥 GET → conversationId
-// export async function GET() {
-//   const conversationId = crypto.randomUUID();
-
-//   return new Response(
-//     JSON.stringify({ conversationId }),
-//     {
-//       headers: {
-//         "Content-Type": "application/json",
-//       },
-//     }
-//   );
-// }
-
-
 import { NextRequest } from "next/server";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const DEFAULT_MODEL = "openrouter/free";
+const MAX_MEMORY_MESSAGES = 20;
+const MAX_INPUT_LENGTH = 300;
+const FALLBACK_MODELS = [
+  "openrouter/free",
+  "deepseek/deepseek-chat",
+  "mistralai/mistral-7b-instruct",
+];
 
-// ─────────────────────────────────────────────
-// 🧠 In-memory store (replace with DB later)
-// ─────────────────────────────────────────────
-const memoryStore = new Map<string, any[]>();
-const MAX_MEMORY = 20; // keep last 20 messages per conversation
+type ChatMessage = {
+  role: "system" | "user" | "assistant";
+  content: string;
+};
 
-function getMemory(id: string): any[] {
-  return memoryStore.get(id) || [];
+type Tool = {
+  id?: string;
+  name?: string;
+  description?: string;
+  method?: string;
+  url?: string;
+  includeApikey?: boolean;
+  apiKey?: string;
+  assignedAgent?: string;
+};
+
+type AgentConfig = {
+  id?: string;
+  name?: string;
+  includeHistory?: boolean;
+  model?: string;
+  systemPrompt?: string;
+  description?: string;
+  instruction?: string;
+};
+
+type Decision =
+  | { type: "identity"; message?: string }
+  | { type: "out_of_scope"; message?: string; reason?: string }
+  | { type: "clarify"; message: string }
+  | { type: "tool"; tool: string; params: Record<string, unknown> }
+  | { type: "response"; content: string };
+
+const memoryStore = new Map<string, ChatMessage[]>();
+
+function getMemory(conversationId: string): ChatMessage[] {
+  return memoryStore.get(conversationId) ?? [];
 }
 
-function updateMemory(id: string, message: any): void {
-  const prev = memoryStore.get(id) || [];
-  const updated = [...prev, message];
-  // Trim to last MAX_MEMORY entries to prevent memory leak
-  memoryStore.set(id, updated.slice(-MAX_MEMORY));
+function addMemory(conversationId: string, message: ChatMessage): void {
+  const existing = memoryStore.get(conversationId) ?? [];
+  memoryStore.set(conversationId, [...existing, message].slice(-MAX_MEMORY_MESSAGES));
 }
 
-// ─────────────────────────────────────────────
-// 🔥 STREAM CALL
-// ─────────────────────────────────────────────
-async function callModelStream(messages: any[]): Promise<Response> {
+async function callModel(messages: ChatMessage[], model?: string): Promise<string> {
   const res = await fetch(OPENROUTER_URL, {
     method: "POST",
     headers: {
@@ -298,364 +62,333 @@ async function callModelStream(messages: any[]): Promise<Response> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "openrouter/free",
+      model: model || DEFAULT_MODEL,
       messages,
-      stream: true,
       temperature: 0,
+      stream: false,
     }),
   });
 
   if (!res.ok) {
-    throw new Error(
-      `Stream call failed: ${res.status} ${res.statusText}`
-    );
+    throw new Error(`Model call failed (${res.status} ${res.statusText})`);
+  }
+
+  const data = await res.json();
+  return data?.choices?.[0]?.message?.content ?? "";
+}
+
+async function callModelStream(messages: ChatMessage[], model?: string): Promise<Response> {
+  const res = await fetch(OPENROUTER_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: model || DEFAULT_MODEL,
+      messages,
+      temperature: 0,
+      stream: true,
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Model stream failed (${res.status} ${res.statusText})`);
   }
 
   return res;
 }
 
-// ─────────────────────────────────────────────
-// 🔥 NORMAL CALL (for decision)
-// ─────────────────────────────────────────────
-async function callModel(messages: any[]): Promise<string> {
-  const res = await fetch(OPENROUTER_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "openrouter/free",
-      messages,
-      temperature: 0,
-    }),
-  });
-
-  if (!res.ok) {
-    throw new Error(
-      `Model call failed: ${res.status} ${res.statusText}`
-    );
-  }
-
-  const data = await res.json();
-  return data?.choices?.[0]?.message?.content || "";
+function safeText(value: unknown): string {
+  return typeof value === "string" ? value : "";
 }
 
-// ─────────────────────────────────────────────
-// 🔥 TOOL EXECUTION — with validation & error handling
-// ─────────────────────────────────────────────
-async function executeTool(tool: any, params: any): Promise<any> {
-  let url: string = tool.url;
+function resolveModel(model: string): string {
+  const normalized = model.trim().toLowerCase();
+  if (!normalized) return DEFAULT_MODEL;
 
-  // Replace placeholders safely
-  for (const key in params) {
-    if (params[key] === undefined || params[key] === null) {
-      console.warn(`[Tool] Missing param "${key}" for tool "${tool.name}"`);
-      continue;
+  const modelMap: Record<string, string> = {
+    "gemini-flash-1.2": "google/gemini-2.0-flash-001",
+    "gemini-flash-1.5": "google/gemini-2.0-flash-001",
+    "gemini-pro-1.2": "google/gemini-pro-1.5",
+    "gemini-pro-2.0": "google/gemini-2.0-pro-exp-02-05",
+    "openrouter/free": "openrouter/free",
+  };
+
+  if (modelMap[normalized]) {
+    return modelMap[normalized];
+  }
+
+  if (normalized.includes("/")) {
+    return model;
+  }
+
+  return DEFAULT_MODEL;
+}
+
+function getModelCandidates(preferred: string): string[] {
+  const ordered = [resolveModel(preferred), ...FALLBACK_MODELS];
+  return [...new Set(ordered.filter(Boolean))];
+}
+
+async function callModelWithFallback(
+  messages: ChatMessage[],
+  preferredModel: string,
+): Promise<string> {
+  let lastError: unknown;
+  for (const model of getModelCandidates(preferredModel)) {
+    try {
+      return await callModel(messages, model);
+    } catch (error) {
+      lastError = error;
+      console.error("[agent-chat] callModel failed", { model, error });
     }
-    url = url.replace(`{${key}}`, encodeURIComponent(String(params[key])));
   }
-
-  // Detect any unfilled placeholders
-  const unfilled = url.match(/\{[^}]+\}/g);
-  if (unfilled) {
-    throw new Error(
-      `Tool "${tool.name}" has unfilled URL placeholders: ${unfilled.join(", ")}`
-    );
-  }
-
-  // Append API key if needed
-  if (tool.includeApikey && tool.apiKey) {
-    url += url.includes("?") ? `&key=${tool.apiKey}` : `?key=${tool.apiKey}`;
-  }
-
-  const res = await fetch(url);
-
-  if (!res.ok) {
-    throw new Error(
-      `Tool "${tool.name}" request failed: ${res.status} ${res.statusText}`
-    );
-  }
-
-  return res.json();
+  throw lastError ?? new Error("All models failed");
 }
 
-// ─────────────────────────────────────────────
-// 🔥 DECISION ENGINE
-// — now receives memory so it has conversation context
-// ─────────────────────────────────────────────
-async function decideAction(
-  input: string,
-  tools: any[],
-  agent: any,
-  memory: any[]
-): Promise<{ type: "tool"; tool: string; params: any } | { type: "response"; content: string } | null> {
-
-  // Use direct agent fields; fall back gracefully
-  const agentInstruction =
-    agent?.instruction ||
-    agent?.systemPrompt ||
-    agent?.description ||
-    "Respond clearly and helpfully to the user.";
-
-  const raw = await callModel([
-    {
-      role: "system",
-      content: `
-You are an AI agent decision engine.
-
-Agent Instructions:
-${agentInstruction}
-
-Available tools:
-${JSON.stringify(tools, null, 2)}
-
-Your job:
-- Understand user intent based on the conversation history and latest message
-- Decide whether to respond normally OR call a tool
-
-Rules:
-- Greetings / casual chat / questions answerable from memory → respond normally
-- Anything requiring real-time or external data → use a tool
-- Use EXACT parameter names from the tool definition
-- Never invent tool names
-
-Return ONLY valid JSON — no markdown, no explanation:
-
-If a tool is needed:
-{
-  "type": "tool",
-  "tool": "<exact_tool_name>",
-  "params": { "<param_key>": "<param_value>" }
+async function callModelStreamWithFallback(
+  messages: ChatMessage[],
+  preferredModel: string,
+): Promise<Response> {
+  let lastError: unknown;
+  for (const model of getModelCandidates(preferredModel)) {
+    try {
+      return await callModelStream(messages, model);
+    } catch (error) {
+      lastError = error;
+      console.error("[agent-chat] callModelStream failed", { model, error });
+    }
+  }
+  throw lastError ?? new Error("All stream models failed");
 }
 
-If no tool is needed:
-{
-  "type": "response",
-  "content": "<your reply to the user>"
+function normalizeToolsForAgent(tools: Tool[], agent: AgentConfig): Tool[] {
+  const agentId = safeText(agent.id);
+  const agentName = safeText(agent.name);
+  return tools.filter((tool) => {
+    const assigned = safeText(tool.assignedAgent);
+    return assigned === agentId || assigned === agentName;
+  });
 }
-      `.trim(),
-    },
-    // Include conversation history so the agent has context
-    ...memory,
-    { role: "user", content: input },
-  ]);
 
-  // Strip any accidental markdown fences
-  const cleaned = raw
-    .replace(/```json/gi, "")
-    .replace(/```/g, "")
-    .trim();
+function getAgentInstruction(agent: AgentConfig, globalSystemPrompt = ""): string {
+  return (
+    safeText(agent.instruction) ||
+    safeText(agent.systemPrompt) ||
+    safeText(globalSystemPrompt) ||
+    safeText(agent.description) ||
+    ""
+  );
+}
 
+function buildScopeMessage(agent: AgentConfig, tools: Tool[]): string {
+  const agentName = safeText(agent.name) || "this agent";
+  const toolNames = tools.map((tool) => safeText(tool.name)).filter(Boolean);
+  if (toolNames.length > 0) {
+    return `I am ${agentName}. I can help only with ${toolNames.join(", ")}. Please ask a question related to this agent's scope.`;
+  }
+  return `I am ${agentName}. Please ask questions related to this agent's configured instructions.`;
+}
+
+function isIdentityQuestion(input: string): boolean {
+  const text = input.toLowerCase();
+  return (
+    text.includes("who are you") ||
+    text.includes("what type of agent") ||
+    text.includes("what kind of agent") ||
+    text.includes("what are you")
+  );
+}
+
+function extractJsonObject(raw: string): Decision | null {
+  const cleaned = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
   try {
-    return JSON.parse(cleaned);
-  } catch (e) {
-    console.error("[decideAction] Failed to parse decision JSON:", cleaned, e);
+    return JSON.parse(cleaned) as Decision;
+  } catch {
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(cleaned.slice(start, end + 1)) as Decision;
+      } catch {
+        return null;
+      }
+    }
     return null;
   }
 }
 
-// ─────────────────────────────────────────────
-// 🔥 POST — main handler
-// ─────────────────────────────────────────────
-export async function POST(req: NextRequest) {
-  let input: string,
-    tools: any[],
-    agents: any[],
-    conversationId: string,
-    agentName: string;
+async function decideAction(
+  input: string,
+  memory: ChatMessage[],
+  agent: AgentConfig,
+  tools: Tool[],
+  workflowRules: string[],
+  globalSystemPrompt: string,
+): Promise<Decision | null> {
+  const agentName = safeText(agent.name) || "Agent";
+  const instruction = getAgentInstruction(agent, globalSystemPrompt);
+  const toolSummary = tools.map((tool) => ({
+    name: safeText(tool.name),
+    description: safeText(tool.description),
+    method: safeText(tool.method || "GET"),
+    url: safeText(tool.url),
+  }));
 
-  try {
-    ({ input, tools, agents, conversationId, agentName } = await req.json());
-  } catch {
-    return new Response(
-      JSON.stringify({ error: "Invalid JSON body" }),
-      { status: 400, headers: { "Content-Type": "application/json" } }
-    );
-  }
+  const prompt = `
+You are the decision engine for one custom agent.
 
-  // 1️⃣ Select agent
-  const activeAgent =
-    agents.find((a: any) => a.name === agentName) || agents[0];
+Agent name: ${agentName}
+Agent instruction: ${instruction || "(none)"}
+Available tools: ${JSON.stringify(toolSummary)}
+Workflow rules from builder: ${JSON.stringify(workflowRules)}
 
-  if (!activeAgent) {
-    return new Response(
-      JSON.stringify({ error: "No agent found" }),
-      { status: 400, headers: { "Content-Type": "application/json" } }
-    );
-  }
+Choose exactly one action and output JSON only.
 
-  // 2️⃣ Filter tools by agent ID or name
-  const agentTools = tools.filter(
-    (t: any) =>
-      t.assignedAgent === activeAgent.id ||
-      t.assignedAgent === activeAgent.name
+Rules:
+1) For greetings/casual chat, use {"type":"response","content":"..."}.
+2) If user asks about agent identity, use {"type":"identity","message":"..."}.
+3) If required input is missing (example: city is missing), use {"type":"clarify","message":"..."}.
+4) If tool call is needed and all params are available, use {"type":"tool","tool":"exact tool name","params":{}}.
+5) Use out_of_scope only when request is clearly unrelated to this agent.
+6) Keep messages natural and AI-like, not robotic.
+`.trim();
+
+  const raw = await callModel(
+    [
+      { role: "system", content: prompt },
+      ...memory,
+      { role: "user", content: input },
+    ],
+    resolveModel(safeText(agent.model)),
   );
 
-  // 3️⃣ Get memory BEFORE saving new message
-  //    (so decision engine sees history only, not the new message twice)
-  const memory = getMemory(conversationId);
+  return extractJsonObject(raw);
+}
 
-  // 4️⃣ Decide action FIRST, then persist to memory on success
-  let decision: Awaited<ReturnType<typeof decideAction>>;
+function replaceUrlParams(url: string, params: Record<string, unknown>): string {
+  return url.replace(/\{([^}]+)\}/g, (_m, key: string) => {
+    const value = params[key];
+    return value === undefined || value === null
+      ? `{${key}}`
+      : encodeURIComponent(String(value));
+  });
+}
+
+async function executeTool(tool: Tool, params: Record<string, unknown>): Promise<unknown> {
+  const method = safeText(tool.method || "GET").toUpperCase();
+  let url = replaceUrlParams(safeText(tool.url), params);
+
+  const unresolved = url.match(/\{[^}]+\}/g);
+  if (unresolved?.length) {
+    throw new Error(`Missing required parameters: ${unresolved.join(", ")}`);
+  }
+
+  if (tool.includeApikey && safeText(tool.apiKey)) {
+    url += url.includes("?") ? `&key=${tool.apiKey}` : `?key=${tool.apiKey}`;
+  }
+
+  const requestInit: RequestInit = { method };
+
+  if (method === "POST") {
+    requestInit.headers = { "Content-Type": "application/json" };
+    requestInit.body = JSON.stringify(params);
+  }
+
+  const res = await fetch(url, requestInit);
+  if (!res.ok) {
+    throw new Error(`Tool request failed (${res.status} ${res.statusText})`);
+  }
+
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return res.json();
+  }
+  return res.text();
+}
+
+function textResponse(message: string, status = 200): Response {
+  return new Response(message, {
+    status,
+    headers: { "Content-Type": "text/plain; charset=utf-8" },
+  });
+}
+
+function stringifyToolResult(value: unknown, maxChars = 12000): string {
+  let text = "";
   try {
-    decision = await decideAction(input, agentTools, activeAgent, memory);
-  } catch (e: any) {
-    console.error("[POST] decideAction error:", e);
-    return new Response(
-      JSON.stringify({ error: "Decision engine failed", detail: e.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    text = JSON.stringify(value, null, 2);
+  } catch {
+    text = String(value);
   }
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, maxChars)}\n... (truncated)`;
+}
 
-  if (!decision) {
-    return new Response(
-      JSON.stringify({ error: "Could not parse decision from model" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
-  }
-
-  // ✅ Now safe to persist the user message
-  updateMemory(conversationId, { role: "user", content: input });
-
-  // ─────────────────────────────────────────────
-  // ✅ CASE A: Normal response (no tool needed)
-  // ─────────────────────────────────────────────
-  if (decision.type === "response") {
-    updateMemory(conversationId, {
-      role: "assistant",
-      content: decision.content,
-    });
-
-    return new Response(decision.content, {
-      headers: { "Content-Type": "text/plain" },
-    });
-  }
-
-  // ─────────────────────────────────────────────
-  // ✅ CASE B: Tool call
-  // ─────────────────────────────────────────────
-
-  // Exact match first, then fuzzy fallback
-  let tool =
-    agentTools.find(
-      (t: any) => t.name.toLowerCase() === decision!.tool?.toLowerCase()
-    ) ||
-    agentTools.find((t: any) =>
-      t.name.toLowerCase().includes(decision!.tool?.toLowerCase())
-    );
-
-  if (!tool) {
-    return new Response(
-      JSON.stringify({
-        error: `Tool "${decision.tool}" not found`,
-        availableTools: agentTools.map((t: any) => t.name),
-      }),
-      { status: 404, headers: { "Content-Type": "application/json" } }
-    );
-  }
-
-  // Execute the tool
-  let toolResult: any;
-  try {
-    toolResult = await executeTool(tool, (decision as any).params || {});
-  } catch (e: any) {
-    console.error("[POST] executeTool error:", e);
-    return new Response(
-      JSON.stringify({ error: "Tool execution failed", detail: e.message }),
-      { status: 502, headers: { "Content-Type": "application/json" } }
-    );
-  }
-
-  // Build agent system prompt from correct field
-  const agentInstruction =
-    activeAgent?.instruction ||
-    activeAgent?.systemPrompt ||
-    activeAgent?.description ||
-    "Respond clearly and helpfully to the user.";
-
-  // Stream final response using tool result
-  let streamRes: Response;
-  try {
-    streamRes = await callModelStream([
-      { role: "system", content: agentInstruction },
-      // Include conversation history for continuity
-      ...memory,
-      {
-        role: "user",
-        content: `User asked: ${input}\n\nTool result (${tool.name}):\n${JSON.stringify(toolResult, null, 2)}`,
-      },
-    ]);
-  } catch (e: any) {
-    console.error("[POST] callModelStream error:", e);
-    return new Response(
-      JSON.stringify({ error: "Stream call failed", detail: e.message }),
-      { status: 502, headers: { "Content-Type": "application/json" } }
-    );
-  }
-
-  const reader = streamRes.body?.getReader();
-
+function createStreamResponse(
+  upstream: Response,
+  onComplete: (fullText: string) => void,
+): Response {
+  const reader = upstream.body?.getReader();
   if (!reader) {
-    return new Response(
-      JSON.stringify({ error: "No stream body received" }),
-      { status: 502, headers: { "Content-Type": "application/json" } }
-    );
+    return textResponse("I could not open response stream. Please try again.");
   }
 
-  const encoder = new TextEncoder();
   const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+  let buffer = "";
   let fullText = "";
+  let completed = false;
 
-  const stream = new ReadableStream({
+  const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n");
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
 
-          for (const line of lines) {
+          for (const rawLine of lines) {
+            const line = rawLine.trim();
             if (!line.startsWith("data: ")) continue;
 
-            const json = line.slice("data: ".length).trim();
-            if (json === "[DONE]") {
-              // Persist final assistant message to memory
-              updateMemory(conversationId, {
-                role: "assistant",
-                content: fullText,
-              });
+            const payload = line.slice("data: ".length).trim();
+            if (!payload) continue;
+
+            if (payload === "[DONE]") {
+              completed = true;
+              onComplete(fullText);
               controller.close();
               return;
             }
 
             try {
-              const parsed = JSON.parse(json);
-              const content = parsed?.choices?.[0]?.delta?.content || "";
-              if (content) {
-                fullText += content;
-                controller.enqueue(encoder.encode(content));
-              }
-            } catch (e) {
-              // Non-fatal: skip malformed SSE chunk
-              console.warn("[Stream] Skipping malformed chunk:", json, e);
+              const parsed = JSON.parse(payload);
+              const token = parsed?.choices?.[0]?.delta?.content ?? "";
+              if (!token) continue;
+              fullText += token;
+              controller.enqueue(encoder.encode(token));
+            } catch {
+              // Skip malformed events.
             }
           }
         }
-      } catch (e) {
-        console.error("[Stream] Fatal stream error:", e);
-        controller.error(e);
+      } catch {
+        controller.error(new Error("Streaming interrupted."));
+        return;
       } finally {
-        // Ensure memory is saved even if stream ends without [DONE]
-        if (fullText) {
-          updateMemory(conversationId, {
-            role: "assistant",
-            content: fullText,
-          });
+        if (!completed) {
+          onComplete(fullText);
         }
-        controller.close();
+        try {
+          controller.close();
+        } catch {
+          // already closed
+        }
       }
     },
   });
@@ -665,12 +398,310 @@ export async function POST(req: NextRequest) {
   });
 }
 
-// ─────────────────────────────────────────────
-// 🔥 GET — generate a new conversationId
-// ─────────────────────────────────────────────
+export async function POST(req: NextRequest) {
+  let body: Record<string, unknown>;
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
+    return textResponse("Invalid request body. Please try again.");
+  }
+
+  const input = safeText(body.input).trim();
+  const tools = Array.isArray(body.tools) ? (body.tools as Tool[]) : [];
+  const agents = Array.isArray(body.agents) ? (body.agents as AgentConfig[]) : [];
+  const conversationId = safeText(body.conversationId) || crypto.randomUUID();
+  const requestedAgentName = safeText(body.agentName);
+  const globalSystemPrompt = safeText(body.systemPrompt);
+  const workflowRules = Array.isArray(body.workflowRules)
+    ? body.workflowRules
+        .map((value) => safeText(value))
+        .filter(Boolean)
+    : [];
+
+  if (!input) {
+    return textResponse("Please enter a message.");
+  }
+
+  if (input.length > MAX_INPUT_LENGTH) {
+    return textResponse(
+      `Your message is too long (${input.length} characters). Please keep it under ${MAX_INPUT_LENGTH} characters.`,
+    );
+  }
+
+  const activeAgent =
+    agents.find((agent) => safeText(agent.name) === requestedAgentName) ?? agents[0];
+
+  if (!activeAgent) {
+    return textResponse("No agent is configured yet. Please reboot the agent once.");
+  }
+
+  const agentTools = normalizeToolsForAgent(tools, activeAgent);
+  const includeHistory = activeAgent.includeHistory !== false;
+  const memory = includeHistory ? getMemory(conversationId) : [];
+  const resolvedInstruction = getAgentInstruction(activeAgent, globalSystemPrompt);
+
+  // Generic no-tool agents should still work fully from prompt/instruction.
+  if (agentTools.length === 0) {
+    const directMessages: ChatMessage[] = [
+      {
+        role: "system",
+        content: `
+You are ${safeText(activeAgent.name) || "an AI agent"}.
+Instruction: ${resolvedInstruction || "Be helpful and follow user intent."}
+Workflow rules: ${JSON.stringify(workflowRules)}
+Answer naturally according to the configured instruction.
+`.trim(),
+      },
+      ...(includeHistory ? memory : []),
+      { role: "user", content: input },
+    ];
+
+    try {
+      const upstream = await callModelStreamWithFallback(
+        directMessages,
+        safeText(activeAgent.model),
+      );
+      addMemory(conversationId, { role: "user", content: input });
+      return createStreamResponse(upstream, (fullText) => {
+        addMemory(conversationId, {
+          role: "assistant",
+          content: fullText || "I can help with that.",
+        });
+      });
+    } catch {
+      let directFallback = "";
+      try {
+        directFallback = await callModelWithFallback(
+          directMessages,
+          safeText(activeAgent.model),
+        );
+      } catch {
+        directFallback = "I can help with that.";
+      }
+      addMemory(conversationId, { role: "user", content: input });
+      addMemory(conversationId, { role: "assistant", content: directFallback });
+      return textResponse(directFallback);
+    }
+  }
+
+  let decision: Decision | null = null;
+  try {
+    decision = await decideAction(
+      input,
+      memory,
+      activeAgent,
+      agentTools,
+      workflowRules,
+      globalSystemPrompt,
+    );
+  } catch {
+    decision = null;
+  }
+
+  if (!decision) {
+    const fallbackPrompt = `
+You are ${safeText(activeAgent.name) || "an AI agent"}.
+Instructions: ${resolvedInstruction}
+User message: ${input}
+Reply naturally in one short response.
+`.trim();
+    let fallback = "";
+    try {
+      fallback = await callModelWithFallback(
+        [{ role: "system", content: fallbackPrompt }],
+        safeText(activeAgent.model),
+      );
+    } catch {
+      fallback = "I can help with that. Could you share a bit more detail?";
+    }
+    addMemory(conversationId, { role: "user", content: input });
+    addMemory(conversationId, { role: "assistant", content: fallback });
+    return textResponse(fallback);
+  }
+
+  if (decision.type === "identity" || isIdentityQuestion(input)) {
+    const identity =
+      safeText((decision as { message?: string }).message) ||
+      `I am ${safeText(activeAgent.name) || "your agent"}.`;
+    addMemory(conversationId, { role: "user", content: input });
+    addMemory(conversationId, { role: "assistant", content: identity });
+    return textResponse(identity);
+  }
+
+  if (decision.type === "clarify") {
+    const clarifyMessage =
+      safeText(decision.message) ||
+      "Could you share a little more detail so I can continue?";
+    addMemory(conversationId, { role: "user", content: input });
+    addMemory(conversationId, { role: "assistant", content: clarifyMessage });
+    return textResponse(clarifyMessage);
+  }
+
+  if (decision.type === "out_of_scope") {
+    let response = safeText(decision.message);
+    if (!response) {
+      try {
+        response = await callModelWithFallback(
+          [
+            {
+              role: "system",
+              content: `You are ${safeText(activeAgent.name) || "an AI agent"}. Politely explain this question is out of scope in one short sentence.`,
+            },
+            { role: "user", content: input },
+          ],
+          safeText(activeAgent.model),
+        );
+      } catch {
+        response = buildScopeMessage(activeAgent, agentTools);
+      }
+    }
+    addMemory(conversationId, { role: "user", content: input });
+    addMemory(conversationId, { role: "assistant", content: response });
+    return textResponse(response);
+  }
+
+  if (decision.type === "response") {
+    const suggested = safeText(decision.content);
+    const responseMessages: ChatMessage[] = [
+      {
+        role: "system",
+        content: `
+You are ${safeText(activeAgent.name) || "an AI agent"}.
+Instruction: ${resolvedInstruction}
+Workflow rules: ${JSON.stringify(workflowRules)}
+Respond naturally for this user message.
+${suggested ? `Draft direction: ${suggested}` : ""}
+`.trim(),
+      },
+      ...(includeHistory ? memory : []),
+      { role: "user", content: input },
+    ];
+
+    try {
+      const upstream = await callModelStreamWithFallback(
+        responseMessages,
+        safeText(activeAgent.model),
+      );
+      addMemory(conversationId, { role: "user", content: input });
+      return createStreamResponse(upstream, (fullText) => {
+        addMemory(conversationId, {
+          role: "assistant",
+          content: fullText || suggested || "I can help with that.",
+        });
+      });
+    } catch {
+      const content = suggested || buildScopeMessage(activeAgent, agentTools);
+      addMemory(conversationId, { role: "user", content: input });
+      addMemory(conversationId, { role: "assistant", content });
+      return textResponse(content);
+    }
+  }
+
+  const selectedTool =
+    agentTools.find((tool) => safeText(tool.name).toLowerCase() === decision.tool.toLowerCase()) ??
+    agentTools.find((tool) =>
+      safeText(tool.name).toLowerCase().includes(decision.tool.toLowerCase()),
+    );
+
+  if (!selectedTool) {
+    let response = "";
+    try {
+      response = await callModelWithFallback(
+        [
+          {
+            role: "system",
+            content: `You are ${safeText(activeAgent.name) || "an AI agent"}. The required tool is unavailable. Ask user to rephrase or try again in one short line.`,
+          },
+          { role: "user", content: input },
+        ],
+        safeText(activeAgent.model),
+      );
+    } catch {
+      response = buildScopeMessage(activeAgent, agentTools);
+    }
+    addMemory(conversationId, { role: "user", content: input });
+    addMemory(conversationId, { role: "assistant", content: response });
+    return textResponse(response);
+  }
+
+  let toolResult: unknown;
+  try {
+    toolResult = await executeTool(selectedTool, decision.params || {});
+  } catch {
+    const message = `I am ${safeText(activeAgent.name) || "this agent"}, but I could not fetch data from "${safeText(selectedTool.name)}" right now. Please try again.`;
+    addMemory(conversationId, { role: "user", content: input });
+    addMemory(conversationId, { role: "assistant", content: message });
+    return textResponse(message);
+  }
+
+  const finalSystemPrompt = `
+You are ${safeText(activeAgent.name) || "an AI agent"}.
+Instruction: ${resolvedInstruction || "Answer only within your configured scope."}
+Workflow rules: ${JSON.stringify(workflowRules)}
+Stay inside this scope. If user asks outside scope, refuse briefly and point back to allowed scope.
+Response policy:
+1) By default, provide a useful formatted response that includes the important fields from the tool output.
+2) If user asks for a specific subset (example: "only temperature"), return only that subset.
+3) Do not hide tool data by over-summarizing.
+4) If tool output is JSON, convert it into human-friendly insights.
+Style policy:
+1) Do NOT print raw JSON and do NOT print long key:value dumps.
+2) Write in natural conversational language with short sections.
+3) Use at most 3-6 bullets only for important points.
+4) Prefer this structure: quick summary sentence -> key highlights -> optional helpful next question.
+5) Keep response concise and readable on chat UI.
+6) Only show raw field-level detail when user explicitly asks for "raw", "full JSON", or "all fields".
+7) If data is tabular, use a VALID markdown table with header row and separator row.
+8) Put each table row on a new line. Do not merge all rows into one paragraph.
+`.trim();
+
+  const finalMessages: ChatMessage[] = [
+    { role: "system", content: finalSystemPrompt },
+    ...(includeHistory ? memory : []),
+    {
+      role: "user",
+      content: `User message: ${input}
+
+Tool (${safeText(selectedTool.name)}) output:
+${stringifyToolResult(toolResult)}
+
+Return response based on the policy above.`,
+    },
+  ];
+
+  try {
+    const upstream = await callModelStreamWithFallback(
+      finalMessages,
+      safeText(activeAgent.model),
+    );
+    addMemory(conversationId, { role: "user", content: input });
+    return createStreamResponse(upstream, (fullText) => {
+      addMemory(conversationId, {
+        role: "assistant",
+        content:
+          fullText ||
+          `I am ${safeText(activeAgent.name) || "this agent"}. I retrieved the data.`,
+      });
+    });
+  } catch {
+    let finalAnswer = "";
+    try {
+      finalAnswer = await callModelWithFallback(
+        finalMessages,
+        safeText(activeAgent.model),
+      );
+    } catch {
+      finalAnswer = `I am ${safeText(activeAgent.name) || "this agent"}. I retrieved the data but could not generate a final response. Please try again.`;
+    }
+
+    addMemory(conversationId, { role: "user", content: input });
+    addMemory(conversationId, { role: "assistant", content: finalAnswer });
+    return textResponse(finalAnswer);
+  }
+}
+
 export async function GET() {
-  const conversationId = crypto.randomUUID();
-  return new Response(JSON.stringify({ conversationId }), {
+  return new Response(JSON.stringify({ conversationId: crypto.randomUUID() }), {
     headers: { "Content-Type": "application/json" },
   });
 }
