@@ -26,3 +26,4 @@ export const CreateNewUser = mutation({
     return user;
   },
 });
+

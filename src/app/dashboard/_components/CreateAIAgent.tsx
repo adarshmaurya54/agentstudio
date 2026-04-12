@@ -18,6 +18,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { api } from '../../../../convex/_generated/api'
 import { useRouter } from 'next/navigation'
 import { UserDetailContext } from '@/context/UserDetailContext'
+import { useAuth } from '@clerk/nextjs'
+import { toast } from 'sonner'
 
 function CreateAIAgent() {
     const [openDialog, setOpenDialog] = useState(false);
@@ -25,9 +27,16 @@ function CreateAIAgent() {
     const [isLoading, setIsLoading] = useState(false);
     const createAgentMutation = useMutation(api.agent.CreateAgent);
     const router = useRouter();
-    const {userDetail, setUserDetail} = useContext(UserDetailContext);
-
+    const { userDetail, setUserDetail } = useContext(UserDetailContext);
+    const { has } = useAuth();
+    const isPaidUser = has && has({ plan: 'unlimited_plan' });
+    console.log(userDetail);
     const CreateAgent = async () => {
+        if (!isPaidUser && userDetail && userDetail.remainingCredits <= 0) {
+            toast.error("You have reached the limit of agent creation. Please upgrade to create more agents.");
+            return;
+        }
+
         if (isLoading || agentName.trim() === '') return;
         setIsLoading(true);
         const agentId = uuidv4(); // Generate unique agent id

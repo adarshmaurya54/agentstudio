@@ -25,6 +25,7 @@ function SettingPanel() {
         )
 
     }
+    if(!selectedNode) return null;
     return (
         <div className="rounded-3xl border bg-white/20 backdrop-blur-sm overflow-hidden md:w-[290px]">
             <div className="max-h-[80vh] overflow-y-auto custom-scrollbar p-3 space-y-5">

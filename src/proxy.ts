@@ -3,6 +3,14 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)', '/', '/api/agent-sdk'])
 
 export default clerkMiddleware(async (auth, req) => {
+    const isInternalSdkToChatCall =
+        req.nextUrl.pathname === '/api/agent-chat' &&
+        req.headers.get('x-agent-sdk-internal') === '1';
+
+    if (isInternalSdkToChatCall) {
+        return;
+    }
+
     if (!isPublicRoute(req)) {
         await auth.protect()
     }

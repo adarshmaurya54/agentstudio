@@ -1,98 +1,47 @@
-'use client';
+'use client'
+import { useEffect } from 'react'
 
-import { useState } from 'react';
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeHighlight from "rehype-highlight";
-import "highlight.js/styles/github.css"; // or dark theme
+function Test() {
+    useEffect(() => {
+        const handleStream = async () => {
+            const res = await fetch('http://localhost:3000/api/agent-sdk', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    userId: 'keydhay28dj2',
+                    agentId: '7296c04f-0c65-4aee-8f2b-48f822738708',
+                    input: 'delhi, india weather'
+                })
+            });
 
-export default function TestAI() {
-    const [input, setInput] = useState('');
-    const [output, setOutput] = useState('');
-    const [loading, setLoading] = useState(false);
+            if (!res.body) return;
 
-    const handleSend = async () => {
-        setOutput('');
-        setLoading(true);
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let done = false;
+            let fullText = '';
 
-        const res = await fetch('/api/ai', {
-            method: 'POST',
-            body: JSON.stringify({ message: input }),
-        });
-
-        const reader = res.body?.getReader();
-        const decoder = new TextDecoder();
-
-        if (!reader) return;
-
-        while (true) {
-            const { done, value } = await reader.read();
-
-            if (done) {
-                setLoading(false); // 🔥 FIX HERE
-                break;
+            while (!done) {
+                const { value, done: doneReading } = await reader.read();
+                done = doneReading;
+                const chunk = decoder.decode(value || new Uint8Array());
+                fullText += chunk;
+                console.log(chunk); // stream token/chunk
             }
 
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n');
-
-            for (let line of lines) {
-                if (line.startsWith('data:')) {
-                    const data = line.replace('data: ', '').trim();
-
-                    if (data === '[DONE]') {
-                        setLoading(false); // 🔥 ALSO HERE
-                        return;
-                    }
-
-                    try {
-                        const json = JSON.parse(data);
-                        const text = json.choices?.[0]?.delta?.content;
-
-                        if (text) {
-                            setOutput((prev) => prev + text);
-                        }
-                    } catch { }
-                }
-            }
+            console.log('Final response:', fullText);
         }
-    };
 
+        handleStream();
+
+    }, [])
     return (
-        <div className="p-5 space-y-4">
-            <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                className="border p-2 w-full"
-            />
-
-            <button onClick={handleSend} className="bg-black text-white px-4 py-2">
-                {loading ? 'Thinking...' : 'Send'}
-            </button>
-
-            <div className="prose max-w-none border p-3 min-h-[100px]">
-                <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    rehypePlugins={[rehypeHighlight]}
-                    components={{
-                        code({ inline, className, children, ...props }: any) {
-                            return !inline ? (
-                                <pre className="bg-black text-white p-3 rounded overflow-auto">
-                                    <code className={className} {...props}>
-                                        {children}
-                                    </code>
-                                </pre>
-                            ) : (
-                                <code className="bg-gray-200 px-1 rounded">
-                                    {children}
-                                </code>
-                            );
-                        },
-                    }}
-                >
-                    {output}
-                </ReactMarkdown>
-            </div>
+        <div>
+            blah
         </div>
-    );
+    )
 }
+
+export default Test

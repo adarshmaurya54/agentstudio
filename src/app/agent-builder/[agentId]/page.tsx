@@ -165,16 +165,16 @@ function AgentBuilder() {
                     {/* @ts-ignore */}
                     <Background variant='dots' gap={15} size={1} />
 
-                    {/* LEFT PANEL */}
+                    {/* agent tools */}
                     <Panel position="top-left" style={{ top: 55 }}>
                         <AiAgentToolsPanel />
                     </Panel>
-                    {/* RIGHT PANEL */}
+                    {/* setting */}
                     <Panel position="top-right" style={{ top: 55 }}>
                         <SettingPanel />
                     </Panel>
 
-                    {/* RIGHT PANEL (SAVE CONTROLS) */}
+                    {/* bottom */}
                     <Panel position='bottom-center' style={{ bottom: 18, }}>
                         <div
                             className={` relative
