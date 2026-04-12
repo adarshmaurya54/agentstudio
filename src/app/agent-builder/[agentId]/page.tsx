@@ -19,6 +19,7 @@ import WhileNode from '../_customNodes/WhileNode';
 import ApprovalNode from '../_customNodes/ApprovalNode';
 import ApiNode from '../_customNodes/ApiNode';
 import SettingPanel from '../_components/SettingPanel';
+import { Button } from '@/components/ui/button';
 
 export const nodeTypes = {
     StartNode: StartNode,
@@ -45,8 +46,10 @@ function AgentBuilder() {
 
     // Load initial data
     useEffect(() => {
+        if(!agentId) return;
+        console.log('Fetching details for agentId:', agentId);
         GetAgentDetails();
-    }, []);
+    }, [agentId]);
 
     const GetAgentDetails = async () => {
         const result = await convex.query(api.agent.GetAgentById, {
@@ -88,9 +91,9 @@ function AgentBuilder() {
             const cleanEdges = edges.map((edge: any) => ({
                 id: edge.id,
                 source: edge.source,
-                sourceHandle: edge.sourceHandle ?? null,   
+                sourceHandle: edge.sourceHandle ?? null,
                 target: edge.target,
-                targetHandle: edge.targetHandle ?? null,   
+                targetHandle: edge.targetHandle ?? null,
                 type: edge.type ?? null
             }));
 
@@ -147,6 +150,20 @@ function AgentBuilder() {
     useOnSelectionChange({
         onChange: onNodeSelect
     })
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (!isDirty) return
+
+            e.preventDefault()
+            e.returnValue = '' // required for Chrome
+        }
+
+        window.addEventListener('beforeunload', handleBeforeUnload)
+
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload)
+        }
+    }, [isDirty])
     return (
         <div>
             <Header agentDetails={agentDetails} previewOption={true} />
@@ -187,29 +204,29 @@ function AgentBuilder() {
                         >
                             <div
                                 className={`
-                                    absolute text-nowrap text-[10px] -bottom-7 left-1/2 -translate-x-1/2 w-fit bg-white border p-1 rounded-full
+                                    absolute text-nowrap text-[10px] -bottom-7 left-1/2 -translate-x-1/2 w-fit bg-white p-1 rounded-full
                                     transition-all duration-300 ease-in-out
                                     ${isDirty ? "opacity-100 scale-100" : "opacity-0 scale-75 pointer-events-none"}
                                     `}
                             >
                                 unsaved changes
                             </div>
-                            <button
+                            <Button
                                 onClick={saveNodesAndEdges}
                                 disabled={isSaving || !isDirty}
                                 className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200
                                  ${isSaving || !isDirty
                                         ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                        : "bg-black text-white hover:bg-gray-900 active:scale-95"
+                                        : "active:scale-95"
                                     }`}
                             >
                                 {isSaving && (
                                     <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                                 )}
                                 {isSaving ? "Saving..." : "Save"}
-                            </button>
+                            </Button>
 
-                            <button
+                            <Button
                                 onClick={() => { resetChanges(); setIsDirty(false) }}
                                 disabled={!isDirty}
                                 className={`
@@ -221,7 +238,7 @@ function AgentBuilder() {
                                 `}
                             >
                                 <span className="whitespace-nowrap">Discard</span>
-                            </button>
+                            </Button>
                         </div>
                     </Panel>
                 </ReactFlow>

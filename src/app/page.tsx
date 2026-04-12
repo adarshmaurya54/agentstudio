@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import Navbar from "@/components/Navbar";
 
 const features = [
   {
@@ -52,47 +53,37 @@ const steps = [
 
 export default function HomePage() {
   return (
-    <div className="relative min-h-screen bg-background text-foreground">
-      <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute left-1/2 top-0 h-80 w-80 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
-      </div>
-
-      <header className="border-b border-border/70 bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo.svg" alt="AgentStudio logo" width={30} height={30} />
-            <span className="text-sm font-semibold sm:text-base">AgentStudio</span>
-          </Link>
-          <Button asChild size="sm">
-            <Link href="/dashboard">
-              Get Started
-              <ArrowRight className="size-4" />
-            </Link>
-          </Button>
-        </div>
+    <div className="relative min-h-screen bg-background text-foreground overflow-x-hidden">
+      <header className="py-10">
+        <Navbar />
       </header>
 
       <main className="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6 lg:px-8">
         <section className="mx-auto max-w-3xl text-center">
-          <div className="mx-auto inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs text-muted-foreground">
-            <Bot className="size-3.5" />
+          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[#8b5cf6]/30 bg-[#8b5cf6]/10 px-3 py-1 text-xs text-[#6d28d9]">
+            <Bot className="size-3.5 text-[#8b5cf6]" />
             AI Agent Builder
           </div>
           <h1 className="mt-6 text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-            Build AI agents visually and publish them as SDK-powered integrations
+            Empower Your <span className="text-[#8b5cf6]">Ideas with</span> Intelligent Agents. No Code, Just Pure AI.
           </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
+          <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-muted-foreground">
             AgentStudio helps you design agent workflows with drag-and-drop nodes,
             preview behavior in chat, and publish ready-to-use SDKs for external integration.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Button asChild size="lg">
+            <Button asChild size="lg" className="bg-[#8b5cf6] rounded-full text-white hover:bg-[#7c3aed]">
               <Link href="/dashboard">
                 Start Building
                 <ArrowRight className="size-4" />
               </Link>
             </Button>
-            <Button asChild variant="outline" size="lg">
+            <Button
+              asChild
+              variant="outline"
+              size="lg"
+              className="border-[#8b5cf6]/30 rounded-full text-[#6d28d9] hover:bg-[#8b5cf6]/10 hover:text-[#6d28d9]"
+            >
               <Link href="#how-it-works">How It Works</Link>
             </Button>
           </div>
@@ -105,10 +96,10 @@ export default function HomePage() {
           </p>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
             {features.map((feature) => (
-              <Card key={feature.title} className="border-border/70 bg-card/80">
+              <Card key={feature.title} className="border-[#8b5cf6]/20 bg-card/90">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-base">
-                    <feature.icon className="size-4 text-muted-foreground" />
+                    <feature.icon className="size-4 text-[#8b5cf6]" />
                     {feature.title}
                   </CardTitle>
                   <CardDescription>{feature.description}</CardDescription>
@@ -125,9 +116,9 @@ export default function HomePage() {
           </p>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
             {steps.map((step) => (
-              <Card key={step.title} className="border-border/70">
+              <Card key={step.title} className="border-[#ec4899]/20">
                 <CardHeader>
-                  <CardTitle className="text-base">{step.title}</CardTitle>
+                  <CardTitle className="text-base text-[#be185d]">{step.title}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">{step.description}</p>

@@ -50,6 +50,7 @@ function CreateAIAgent() {
         setIsLoading(false);
         // navigate to the agent builder screen
         router.push(`/agent-builder/${agentId}`)
+        router.refresh();
     }
     return (
         <div className='flex items-center w-full flex-col justify-center'>
