@@ -107,7 +107,7 @@ export function AppSidebar() {
                 </SidebarGroup >
             </SidebarContent>
             <SidebarFooter className="mb-5 space-y-3" >
-                {<div className="flex items-center gap-3">
+                {!isPaidUser && <div className="flex items-center gap-3">
                     <Gem/>
                     {open && <h2>Remaining Credits: <span className="font-semibold">{totalRemainingCredits}/4</span></h2>}
                 </div>}
