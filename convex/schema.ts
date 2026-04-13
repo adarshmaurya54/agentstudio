@@ -17,5 +17,14 @@ export default defineSchema({
         published: v.boolean(),
         userId: v.id("UserTable"),
         agentToolConfig: v.optional(v.any())
+    }),
+    ConversationTable: defineTable({
+        conversationId: v.string(),
+        agentId: v.string(),
+        userId: v.string(),
+        role: v.union(v.literal("system"), v.literal("user"), v.literal("assistant")),
+        content: v.string(),
     })
+        .index("by_conversationId_and_agentId_and_userId", ["conversationId", "agentId", "userId"])
+        .index("by_agentId_and_userId", ["agentId", "userId"]),
 })

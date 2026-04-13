@@ -1,4 +1,6 @@
 import { NextRequest } from "next/server";
+import { fetchMutation, fetchQuery } from "convex/nextjs";
+import { api } from "../../../../convex/_generated/api";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const DEFAULT_MODEL = "openrouter/free";
@@ -13,6 +15,12 @@ const FALLBACK_MODELS = [
 type ChatMessage = {
   role: "system" | "user" | "assistant";
   content: string;
+};
+
+type MemoryContext = {
+  conversationId: string;
+  agentId: string;
+  userId: string;
 };
 
 type Tool = {
@@ -52,6 +60,54 @@ function getMemory(conversationId: string): ChatMessage[] {
 function addMemory(conversationId: string, message: ChatMessage): void {
   const existing = memoryStore.get(conversationId) ?? [];
   memoryStore.set(conversationId, [...existing, message].slice(-MAX_MEMORY_MESSAGES));
+}
+
+async function getConversationMemory(context: MemoryContext): Promise<ChatMessage[]> {
+  const localMemory = getMemory(context.conversationId);
+
+  if (!context.agentId || !context.userId) {
+    return localMemory;
+  }
+
+  try {
+    const rows = await fetchQuery(api.conversation.GetConversationMessages, {
+      conversationId: context.conversationId,
+      agentId: context.agentId,
+      userId: context.userId,
+      limit: MAX_MEMORY_MESSAGES,
+    });
+
+    const dbMessages = rows.map((row) => ({
+      role: row.role,
+      content: row.content,
+    })) as ChatMessage[];
+
+    memoryStore.set(context.conversationId, dbMessages);
+    return dbMessages;
+  } catch (error) {
+    console.error("[agent-chat] failed to fetch conversation history", error);
+    return localMemory;
+  }
+}
+
+async function persistMessage(context: MemoryContext, message: ChatMessage): Promise<void> {
+  addMemory(context.conversationId, message);
+
+  if (!context.agentId || !context.userId) {
+    return;
+  }
+
+  try {
+    await fetchMutation(api.conversation.SaveConversationMessage, {
+      conversationId: context.conversationId,
+      agentId: context.agentId,
+      userId: context.userId,
+      role: message.role,
+      content: message.content,
+    });
+  } catch (error) {
+    console.error("[agent-chat] failed to persist conversation message", error);
+  }
 }
 
 async function callModel(messages: ChatMessage[], model?: string): Promise<string> {
@@ -328,7 +384,7 @@ function stringifyToolResult(value: unknown, maxChars = 12000): string {
 
 function createStreamResponse(
   upstream: Response,
-  onComplete: (fullText: string) => void,
+  onComplete: (fullText: string) => Promise<void> | void,
 ): Response {
   const reader = upstream.body?.getReader();
   if (!reader) {
@@ -361,7 +417,7 @@ function createStreamResponse(
 
             if (payload === "[DONE]") {
               completed = true;
-              onComplete(fullText);
+              await onComplete(fullText);
               controller.close();
               return;
             }
@@ -382,7 +438,7 @@ function createStreamResponse(
         return;
       } finally {
         if (!completed) {
-          onComplete(fullText);
+          await onComplete(fullText);
         }
         try {
           controller.close();
@@ -410,6 +466,8 @@ export async function POST(req: NextRequest) {
   const tools = Array.isArray(body.tools) ? (body.tools as Tool[]) : [];
   const agents = Array.isArray(body.agents) ? (body.agents as AgentConfig[]) : [];
   const conversationId = safeText(body.conversationId) || crypto.randomUUID();
+  const agentId = safeText(body.agentId).trim();
+  const userId = safeText(body.userId).trim();
   const requestedAgentName = safeText(body.agentName);
   const globalSystemPrompt = safeText(body.systemPrompt);
   const workflowRules = Array.isArray(body.workflowRules)
@@ -437,7 +495,12 @@ export async function POST(req: NextRequest) {
 
   const agentTools = normalizeToolsForAgent(tools, activeAgent);
   const includeHistory = activeAgent.includeHistory !== false;
-  const memory = includeHistory ? getMemory(conversationId) : [];
+  const memoryContext: MemoryContext = {
+    conversationId,
+    agentId,
+    userId,
+  };
+  const memory = includeHistory ? await getConversationMemory(memoryContext) : [];
   const resolvedInstruction = getAgentInstruction(activeAgent, globalSystemPrompt);
 
   // Generic no-tool agents should still work fully from prompt/instruction.
@@ -461,9 +524,9 @@ Answer naturally according to the configured instruction.
         directMessages,
         safeText(activeAgent.model),
       );
-      addMemory(conversationId, { role: "user", content: input });
-      return createStreamResponse(upstream, (fullText) => {
-        addMemory(conversationId, {
+      await persistMessage(memoryContext, { role: "user", content: input });
+      return createStreamResponse(upstream, async (fullText) => {
+        await persistMessage(memoryContext, {
           role: "assistant",
           content: fullText || "I can help with that.",
         });
@@ -478,8 +541,8 @@ Answer naturally according to the configured instruction.
       } catch {
         directFallback = "I can help with that.";
       }
-      addMemory(conversationId, { role: "user", content: input });
-      addMemory(conversationId, { role: "assistant", content: directFallback });
+      await persistMessage(memoryContext, { role: "user", content: input });
+      await persistMessage(memoryContext, { role: "assistant", content: directFallback });
       return textResponse(directFallback);
     }
   }
@@ -514,8 +577,8 @@ Reply naturally in one short response.
     } catch {
       fallback = "I can help with that. Could you share a bit more detail?";
     }
-    addMemory(conversationId, { role: "user", content: input });
-    addMemory(conversationId, { role: "assistant", content: fallback });
+    await persistMessage(memoryContext, { role: "user", content: input });
+    await persistMessage(memoryContext, { role: "assistant", content: fallback });
     return textResponse(fallback);
   }
 
@@ -523,8 +586,8 @@ Reply naturally in one short response.
     const identity =
       safeText((decision as { message?: string }).message) ||
       `I am ${safeText(activeAgent.name) || "your agent"}.`;
-    addMemory(conversationId, { role: "user", content: input });
-    addMemory(conversationId, { role: "assistant", content: identity });
+    await persistMessage(memoryContext, { role: "user", content: input });
+    await persistMessage(memoryContext, { role: "assistant", content: identity });
     return textResponse(identity);
   }
 
@@ -532,8 +595,8 @@ Reply naturally in one short response.
     const clarifyMessage =
       safeText(decision.message) ||
       "Could you share a little more detail so I can continue?";
-    addMemory(conversationId, { role: "user", content: input });
-    addMemory(conversationId, { role: "assistant", content: clarifyMessage });
+    await persistMessage(memoryContext, { role: "user", content: input });
+    await persistMessage(memoryContext, { role: "assistant", content: clarifyMessage });
     return textResponse(clarifyMessage);
   }
 
@@ -555,8 +618,8 @@ Reply naturally in one short response.
         response = buildScopeMessage(activeAgent, agentTools);
       }
     }
-    addMemory(conversationId, { role: "user", content: input });
-    addMemory(conversationId, { role: "assistant", content: response });
+    await persistMessage(memoryContext, { role: "user", content: input });
+    await persistMessage(memoryContext, { role: "assistant", content: response });
     return textResponse(response);
   }
 
@@ -582,17 +645,17 @@ ${suggested ? `Draft direction: ${suggested}` : ""}
         responseMessages,
         safeText(activeAgent.model),
       );
-      addMemory(conversationId, { role: "user", content: input });
-      return createStreamResponse(upstream, (fullText) => {
-        addMemory(conversationId, {
+      await persistMessage(memoryContext, { role: "user", content: input });
+      return createStreamResponse(upstream, async (fullText) => {
+        await persistMessage(memoryContext, {
           role: "assistant",
           content: fullText || suggested || "I can help with that.",
         });
       });
     } catch {
       const content = suggested || buildScopeMessage(activeAgent, agentTools);
-      addMemory(conversationId, { role: "user", content: input });
-      addMemory(conversationId, { role: "assistant", content });
+      await persistMessage(memoryContext, { role: "user", content: input });
+      await persistMessage(memoryContext, { role: "assistant", content });
       return textResponse(content);
     }
   }
@@ -619,8 +682,8 @@ ${suggested ? `Draft direction: ${suggested}` : ""}
     } catch {
       response = buildScopeMessage(activeAgent, agentTools);
     }
-    addMemory(conversationId, { role: "user", content: input });
-    addMemory(conversationId, { role: "assistant", content: response });
+    await persistMessage(memoryContext, { role: "user", content: input });
+    await persistMessage(memoryContext, { role: "assistant", content: response });
     return textResponse(response);
   }
 
@@ -629,8 +692,8 @@ ${suggested ? `Draft direction: ${suggested}` : ""}
     toolResult = await executeTool(selectedTool, decision.params || {});
   } catch {
     const message = `I am ${safeText(activeAgent.name) || "this agent"}, but I could not fetch data from "${safeText(selectedTool.name)}" right now. Please try again.`;
-    addMemory(conversationId, { role: "user", content: input });
-    addMemory(conversationId, { role: "assistant", content: message });
+    await persistMessage(memoryContext, { role: "user", content: input });
+    await persistMessage(memoryContext, { role: "assistant", content: message });
     return textResponse(message);
   }
 
@@ -674,9 +737,9 @@ Return response based on the policy above.`,
       finalMessages,
       safeText(activeAgent.model),
     );
-    addMemory(conversationId, { role: "user", content: input });
-    return createStreamResponse(upstream, (fullText) => {
-      addMemory(conversationId, {
+    await persistMessage(memoryContext, { role: "user", content: input });
+    return createStreamResponse(upstream, async (fullText) => {
+      await persistMessage(memoryContext, {
         role: "assistant",
         content:
           fullText ||
@@ -694,14 +757,35 @@ Return response based on the policy above.`,
       finalAnswer = `I am ${safeText(activeAgent.name) || "this agent"}. I retrieved the data but could not generate a final response. Please try again.`;
     }
 
-    addMemory(conversationId, { role: "user", content: input });
-    addMemory(conversationId, { role: "assistant", content: finalAnswer });
+    await persistMessage(memoryContext, { role: "user", content: input });
+    await persistMessage(memoryContext, { role: "assistant", content: finalAnswer });
     return textResponse(finalAnswer);
   }
 }
 
-export async function GET() {
-  return new Response(JSON.stringify({ conversationId: crypto.randomUUID() }), {
+export async function GET(req: NextRequest) {
+  const requestedConversationId = safeText(req.nextUrl.searchParams.get("conversationId"));
+  const agentId = safeText(req.nextUrl.searchParams.get("agentId"));
+  const userId = safeText(req.nextUrl.searchParams.get("userId"));
+  const preview = safeText(req.nextUrl.searchParams.get("preview")) === "1";
+
+  const conversationId =
+    requestedConversationId ||
+    (agentId && userId
+      ? `${preview ? "preview" : "chat"}:${userId}:${agentId}`
+      : crypto.randomUUID());
+
+  const messages =
+    agentId && userId
+      ? await getConversationMemory({
+          conversationId,
+          agentId,
+          userId,
+        })
+      : [];
+
+  return new Response(JSON.stringify({ conversationId, messages }), {
     headers: { "Content-Type": "application/json" },
   });
 }
+

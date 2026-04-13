@@ -50,6 +50,8 @@ export async function POST(req: NextRequest) {
     agentName:
       (typeof config.primaryAgentName === "string" && config.primaryAgentName) ||
       (typeof agent.name === "string" ? agent.name : ""),
+    agentId,
+    userId,
     conversationId,
   };
 
