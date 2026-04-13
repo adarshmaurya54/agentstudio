@@ -7,6 +7,21 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import "katex/dist/katex.min.css";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
+import { useMutation } from "convex/react";
+import { api } from "../../../../../../convex/_generated/api";
+
 
 type Props = {
   GenerateAgentToolConfig: () => void;
@@ -33,10 +48,10 @@ export default function ChatUI({
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [conversationId, setConversationId] = useState<string>("");
-
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const chatRef = useRef<HTMLDivElement | null>(null);
-
+  const deleteConversation = useMutation(api.conversation.DeleteConversation); // to delete conversation when rebooting agent for a fresh start in preview
   const normalizeMessageText = (text: string) =>
     text
       .replace(/\r\n/g, "\n")
@@ -45,39 +60,45 @@ export default function ChatUI({
 
   const getWelcomeMessage = (): UiMessage => ({
     role: "bot",
-    text: "Welcome. This is your AI assistant.",
+    text: "",
   });
 
   useEffect(() => {
     const init = async () => {
       if (!agentDetails?.agentId || !agentDetails?.userId) return;
 
-      const searchParams = new URLSearchParams({
-        agentId: agentDetails.agentId,
-        userId: String(agentDetails.userId),
-        preview: "1",
-      });
+      setIsLoadingHistory(true); // START LOADING
 
-      const res = await fetch(`/api/agent-chat?${searchParams.toString()}`, {
-        method: "GET",
-      });
-      const data = await res.json();
+      try {
+        const searchParams = new URLSearchParams({
+          agentId: agentDetails.agentId,
+          userId: String(agentDetails.userId),
+          preview: "1",
+        });
 
-      const history: UiMessage[] = Array.isArray(data?.messages)
-        ? (data.messages as StoredMessage[])
+        const res = await fetch(`/api/agent-chat?${searchParams.toString()}`);
+        const data = await res.json();
+
+        const history: UiMessage[] = Array.isArray(data?.messages)
+          ? (data.messages as StoredMessage[])
             .filter(
               (msg) =>
                 (msg.role === "assistant" || msg.role === "user") &&
-                typeof msg.content === "string",
+                typeof msg.content === "string"
             )
             .map((msg) => ({
               role: msg.role === "assistant" ? "bot" : "user",
               text: msg.content,
             }))
-        : [];
+          : [];
 
-      setConversationId(data.conversationId);
-      setMessages(history.length > 0 ? history : [getWelcomeMessage()]);
+        setConversationId(data.conversationId);
+        setMessages(history.length > 0 ? history : [getWelcomeMessage()]);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsLoadingHistory(false); // STOP LOADING
+      }
     };
 
     init();
@@ -153,105 +174,141 @@ export default function ChatUI({
   };
 
   return (
-    <div className="h-full flex flex-col bg-white text-black rounded-2xl overflow-hidden">
+    <div className="h-full flex flex-col bg-white text-black rounded-none sm:rounded-3xl overflow-hidden">
       <div ref={chatRef} className="flex-1 relative overflow-y-auto">
         <div className="sticky top-0 border-gray-200 p-2 bg-linear-to-t from-transparent via-white/90 to-white">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between pl-3 items-center">
             <h2 className="text-lg font-semibold">{agentDetails?.name || "Agent"}</h2>
-            <Button
-              className="rounded-xl text-xs"
-              onClick={GenerateAgentToolConfig}
-              disabled={loading}
-            >
-              <RefreshCcwIcon className={`${loading && "animate-spin"} w-3 h-3`} />
-              Reboot
-            </Button>
-          </div>
-        </div>
-        <div className="py-4 min-h-[78%] space-y-3">
-          {messages.map((msg, i) => (
-            <div
-              key={i}
-              className={`flex px-4 flex-col ${
-                msg.role === "user" ? "justify-end" : "justify-start"
-              }`}
-            >
-              <div
-                className={`
-                px-4 py-3 rounded-2xl text-sm break-words
-                ${
-                  msg.role === "user"
-                    ? "ml-auto max-w-[78%] bg-gray-300 text-black rounded-br-sm"
-                    : "max-w-[95%]  border-gray-200 rounded-bl-sm"
-                }
-              `}
-              >
-                {msg.text || (isStreaming && i === messages.length - 1) ? (
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      p: ({ children }) => (
-                        <p className="mb-1 leading-6 last:mb-0">{children}</p>
-                      ),
-                      ol: ({ children }) => (
-                        <ol className="list-decimal pl-5 my-1 space-y-0.5">{children}</ol>
-                      ),
-                      ul: ({ children }) => (
-                        <ul className="list-disc pl-5 my-1 space-y-0.5">{children}</ul>
-                      ),
-                      li: ({ children }) => <li className="leading-6">{children}</li>,
-                      h1: ({ children }) => (
-                        <h1 className="text-base font-semibold my-2">{children}</h1>
-                      ),
-                      h2: ({ children }) => (
-                        <h2 className="text-sm font-semibold my-2">{children}</h2>
-                      ),
-                      h3: ({ children }) => (
-                        <h3 className="text-sm font-semibold my-1">{children}</h3>
-                      ),
-                      strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                      code: ({ children }) => (
-                        <code className="bg-black/10 px-1 py-0.5 rounded">{children}</code>
-                      ),
-                      table: ({ children }) => (
-                        <div className="my-2 w-full overflow-x-auto rounded-lg border border-gray-300">
-                          <table className="w-full min-w-[420px] border-collapse text-left text-sm">
-                            {children}
-                          </table>
-                        </div>
-                      ),
-                      thead: ({ children }) => <thead className="bg-gray-200/70">{children}</thead>,
-                      tbody: ({ children }) => <tbody>{children}</tbody>,
-                      tr: ({ children }) => <tr className="border-t border-gray-300">{children}</tr>,
-                      th: ({ children }) => (
-                        <th className="px-3 py-2 font-semibold text-black whitespace-nowrap">
-                          {children}
-                        </th>
-                      ),
-                      td: ({ children }) => (
-                        <td className="px-3 py-2 align-top leading-6">{children}</td>
-                      ),
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button className="rounded-xl text-xs" disabled={loading}>
+                  <RefreshCcwIcon className={`${loading && "animate-spin"} w-3 h-3`} />
+                  Reboot
+                </Button>
+              </AlertDialogTrigger>
+
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete all conversation history for this agent.
+                    This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+
+                  <AlertDialogAction
+                    onClick={async () => {
+                      if (!conversationId) return;
+
+                      await deleteConversation({
+                        conversationId,
+                        agentId: agentDetails.agentId,
+                        userId: String(agentDetails.userId),
+                      });
+
+                      // reset UI
+                      setMessages([getWelcomeMessage()]);
+                      GenerateAgentToolConfig();
                     }}
                   >
-                    {normalizeMessageText(msg.text)}
-                  </ReactMarkdown>
-                ) : null}
-
-                {isStreaming && i === messages.length - 1 && !msg.text && (
-                  <div className="flex gap-1 mt-1">
-                    <span className="w-2 h-2 bg-black rounded-full animate-bounce"></span>
-                    <span className="w-2 h-2 bg-black rounded-full animate-bounce [animation-delay:0.2s]"></span>
-                    <span className="w-2 h-2 bg-black rounded-full animate-bounce [animation-delay:0.4s]"></span>
-                  </div>
-                )}
-              </div>
+                    Yes, delete everything
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+        <div className="py-4 min-h-[78%] space-y-3 sm:px-4">
+          {isLoadingHistory ? (
+            <div className="flex items-center justify-center h-[60vh]">
+              <span className="w-8 h-8 border-4 border-gray-300 border-t-transparent rounded-full animate-spin"></span>
             </div>
-          ))}
+          ) : (
+            messages.map((msg, i) => (
+              <div
+                key={i}
+                className={`flex px-2 flex-col ${msg.role === "user" ? "justify-end" : "justify-start"
+                  }`}
+              >
+                <div
+                  className={`
+                rounded-2xl text-sm break-words
+                ${msg.role === "user"
+                      ? "ml-auto px-4 py-3 max-w-[85%] sm:max-w-[70%] bg-[#e6dbff] text-black rounded-br-sm"
+                      : "max-w-[95%] sm:max-w-[85%] border-gray-200 rounded-bl-sm"
+                    }
+              `}
+                >
+                  {msg.text || (isStreaming && i === messages.length - 1) ? (
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        p: ({ children }) => (
+                          <p className="mb-1 leading-6 last:mb-0">{children}</p>
+                        ),
+                        ol: ({ children }) => (
+                          <ol className="list-decimal pl-5 my-1 space-y-0.5">{children}</ol>
+                        ),
+                        ul: ({ children }) => (
+                          <ul className="list-disc pl-5 my-1 space-y-0.5">{children}</ul>
+                        ),
+                        li: ({ children }) => <li className="leading-6">{children}</li>,
+                        h1: ({ children }) => (
+                          <h1 className="text-base font-semibold my-2">{children}</h1>
+                        ),
+                        h2: ({ children }) => (
+                          <h2 className="text-sm font-semibold my-2">{children}</h2>
+                        ),
+                        h3: ({ children }) => (
+                          <h3 className="text-sm font-semibold my-1">{children}</h3>
+                        ),
+                        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                        code: ({ children }) => (
+                          <code className="bg-black/10 px-1 py-0.5 rounded">{children}</code>
+                        ),
+                        table: ({ children }) => (
+                          <div className="my-2 w-full overflow-x-auto rounded-lg border border-gray-300">
+                            <table className="w-full min-w-[420px] border-collapse text-left text-sm">
+                              {children}
+                            </table>
+                          </div>
+                        ),
+                        thead: ({ children }) => <thead className="bg-gray-200/70">{children}</thead>,
+                        tbody: ({ children }) => <tbody>{children}</tbody>,
+                        tr: ({ children }) => <tr className="border-t border-gray-300">{children}</tr>,
+                        th: ({ children }) => (
+                          <th className="px-3 py-2 font-semibold text-black whitespace-nowrap">
+                            {children}
+                          </th>
+                        ),
+                        td: ({ children }) => (
+                          <td className="px-3 py-2 align-top leading-6">{children}</td>
+                        ),
+                      }}
+                    >
+                      {normalizeMessageText(msg.text)}
+                    </ReactMarkdown>
+                  ) : null}
+
+                  {isStreaming && i === messages.length - 1 && !msg.text && (
+                    <div className="flex gap-1 mt-1">
+                      <span className="w-2 h-2 bg-black rounded-full animate-bounce"></span>
+                      <span className="w-2 h-2 bg-black rounded-full animate-bounce [animation-delay:0.2s]"></span>
+                      <span className="w-2 h-2 bg-black rounded-full animate-bounce [animation-delay:0.4s]"></span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         <div className="sticky bottom-0 border-gray-200 p-2 bg-linear-to-t from-white via-white/30 to-transparent">
           <div className="w-full max-w-2xl mx-auto">
-            <div className="relative p-[2px] gap-2 bg-white border border-gray-300 rounded-4xl p-">
+            <div className="relative p-[2px] gap-2 bg-white border border-gray-300 rounded-4xl">
               <Textarea
                 value={input}
                 disabled={isStreaming}
@@ -267,29 +324,16 @@ export default function ChatUI({
                 }}
                 placeholder="Type your message..."
                 rows={1}
-                className="
-                flex-1
-                resize-none
-                border-none
-                pl-4
-                w-[93%]
-                shadow-none
-                focus-visible:ring-0
-                bg-transparent
-                text-sm
-                leading-5
-                max-h-32
-                overflow-y-auto
-              "
+                className="flex-1 resize-none border-none px-4 pr-10 w-full shadow-none focus-visible:ring-0 bg-transparent text-sm leading-5 max-h-32 overflow-y-auto"
               />
 
-              <button
+              <Button
                 onClick={sendMessage}
                 disabled={isStreaming || !input.trim() || !conversationId}
-                className="w-8 h-8 absolute bottom-1 right-1 flex items-center justify-center rounded-full bg-black text-white shrink-0"
+                className="absolute right-1 bottom-1 w-8 h-8 flex items-center justify-center rounded-full text-white shrink-0"
               >
                 <ArrowUpToLine className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
           </div>
         </div>

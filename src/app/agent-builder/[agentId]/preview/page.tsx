@@ -11,12 +11,13 @@ import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { RefreshCcwIcon } from 'lucide-react';
 import ChatUI from './_component/ChatUI';
+import { LoaderOne } from '@/components/ui/loader';
 
 function Preview() {
     const [config, setConfig] = useState<any>();
     const [agentDetails, setAgentDetails] = useState<Agent>();
     const [loading, setLoading] = useState(false);
-
+    const [activeView, setActiveView] = useState<"preview" | "chat">("chat");
     // ✅ SPLITTER STATE
     const [leftWidth, setLeftWidth] = useState(65); // %
     const isDragging = useRef(false);
@@ -119,58 +120,89 @@ function Preview() {
     }, []);
 
     return (
-        <div className="h-screen flex flex-col">
+        <div className="h-screen relative flex flex-col">
             <Header agentDetails={agentDetails} previewOption={false} />
+            {!agentDetails?.agentToolConfig && (
+                <div className="absolute top-0 right-0 w-full h-full flex justify-center items-center backdrop-blur-md z-20">
+                    <LoaderOne />
+                </div>
+            )}
+            <div className="flex flex-1 overflow-hidden p-2 sm:p-5 flex-col">
 
-            {/* 🔥 FLEX SPLIT LAYOUT */}
-            <div className="flex flex-1 overflow-hidden p-5">
-
-                {/* LEFT PANEL */}
-                <div
-                    style={{ width: `${leftWidth}%` }}
-                    className="border rounded-2xl relative overflow-hidden"
-                >
-                    <h2 className='absolute top-2 left-2 z-10'>Preview</h2>
-
-                    <div className="w-full h-full">
-                        <ReactFlow
-                            nodes={agentDetails?.nodes || []}
-                            edges={agentDetails?.edges || []}
-                            fitView
-                            nodeTypes={nodeTypes}
-                            draggable={false}
-                        >
-                            <Background gap={15} size={1} />
-                        </ReactFlow>
-                    </div>
+                {/* 🔥 MOBILE TOGGLE */}
+                <div className="flex sm:hidden mb-2 bg-gray-100 rounded-xl p-1">
+                    <button
+                        onClick={() => setActiveView("preview")}
+                        className={`flex-1 py-1 text-sm rounded-lg ${activeView === "preview" ? "bg-white shadow" : ""
+                            }`}
+                    >
+                        Preview
+                    </button>
+                    <button
+                        onClick={() => setActiveView("chat")}
+                        className={`flex-1 py-1 text-sm rounded-lg ${activeView === "chat" ? "bg-white shadow" : ""
+                            }`}
+                    >
+                        Chat
+                    </button>
                 </div>
 
-                {/* 🔥 SPLITTER */}
-                <div
-                    onMouseDown={handleMouseDown}
-                    className="w-2 flex items-center justify-center h-full rounded-full cursor-col-resize transition"
-                >
-                    <div className='w-1 h-[30px] rounded-full bg-gray-400' />
-                </div>
+                <div className="flex flex-1 overflow-hidden gap-2">
 
-                {/* RIGHT PANEL */}
-                <div className="flex-1 border rounded-2xl h-full flex flex-col overflow-hidden">
+                    {/* LEFT PANEL */}
+                    <div
+                        style={{ width: `${leftWidth}%` }}
+                        className={`
+        border rounded-4xl relative overflow-hidden
+        ${activeView !== "preview" ? "hidden sm:block" : "w-full!"}
+        w-full sm:w-auto
+      `}
+                    >
+                        <h2 className="absolute top-2 left-2 z-10 text-sm">Preview</h2>
 
-                    {!agentDetails?.agentToolConfig ? (
-                        <div className='flex items-center justify-center h-full'>
-                            <Button onClick={GenerateAgentToolConfig} disabled={loading}>
-                                <RefreshCcwIcon className={`${loading && 'animate-spin'}`} />
-                                Reboot Agent
-                            </Button>
+                        <div className="w-full h-full">
+                            <ReactFlow
+                                nodes={agentDetails?.nodes || []}
+                                edges={agentDetails?.edges || []}
+                                fitView
+                                nodeTypes={nodeTypes}
+                                draggable={false}
+                            >
+                                <Background gap={15} size={1} />
+                            </ReactFlow>
                         </div>
-                    ) : (
-                        <ChatUI
-                            GenerateAgentToolConfig={GenerateAgentToolConfig}
-                            loading={loading}
-                            agentDetails={agentDetails}
-                        />
-                    )}
+                    </div>
 
+                    {/* 🔥 SPLITTER (ONLY DESKTOP) */}
+                    <div
+                        onMouseDown={handleMouseDown}
+                        className="hidden sm:flex w-2 items-center justify-center h-full cursor-col-resize"
+                    >
+                        <div className="w-1 h-[30px] rounded-full bg-gray-400" />
+                    </div>
+
+                    {/* RIGHT PANEL */}
+                    <div
+                        className={`
+        flex-1 border rounded-4xl h-full flex flex-col overflow-hidden
+        ${activeView !== "chat" ? "hidden sm:flex" : ""}
+      `}
+                    >
+                        {!agentDetails?.agentToolConfig ? (
+                            <div className="flex items-center justify-center h-full">
+                                <Button onClick={GenerateAgentToolConfig} disabled={loading}>
+                                    <RefreshCcwIcon className={`${loading && "animate-spin"}`} />
+                                    Reboot Agent
+                                </Button>
+                            </div>
+                        ) : (
+                            <ChatUI
+                                GenerateAgentToolConfig={GenerateAgentToolConfig}
+                                loading={loading}
+                                agentDetails={agentDetails}
+                            />
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
