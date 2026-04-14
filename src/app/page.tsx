@@ -53,7 +53,7 @@ const steps = [
 
 export default function HomePage() {
   return (
-    <div className="bg-[url('/blur-bg.png')] relative min-h-screen bg-no-repeat md:bg-cover bg-contain text-foreground overflow-x-hidden">
+    <div className="bg-[url('/blur-bg.png')] md:bg-[center_30px] bg-[center_100px] relative min-h-screen bg-no-repeat md:bg-cover bg-contain text-foreground overflow-x-hidden">
       <header className="py-10">
         <Navbar />
       </header>
@@ -96,7 +96,7 @@ export default function HomePage() {
           </p>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
             {features.map((feature) => (
-              <Card key={feature.title} className="">
+              <Card key={feature.title} className="rounded-3xl ring-[0.5px] ring-[#8b5cf6]/10 border-none">
                 <CardHeader className="">
                   <CardTitle className="flex items-center gap-2 text-base">
                     <feature.icon className="size-4 text-[#8b5cf6]" />
@@ -116,7 +116,7 @@ export default function HomePage() {
           </p>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
             {steps.map((step) => (
-              <Card key={step.title} className="border-[#ec4899]/10">
+              <Card key={step.title} className="rounded-3xl ring-[0.5px] ring-[#8b5cf6]/10 border-none">
                 <CardHeader>
                   <CardTitle className="text-base text-[#be185d]">{step.title}</CardTitle>
                 </CardHeader>
