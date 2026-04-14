@@ -472,8 +472,8 @@ export async function POST(req: NextRequest) {
   const globalSystemPrompt = safeText(body.systemPrompt);
   const workflowRules = Array.isArray(body.workflowRules)
     ? body.workflowRules
-        .map((value) => safeText(value))
-        .filter(Boolean)
+      .map((value) => safeText(value))
+      .filter(Boolean)
     : [];
 
   if (!input) {
@@ -696,11 +696,25 @@ ${suggested ? `Draft direction: ${suggested}` : ""}
     await persistMessage(memoryContext, { role: "assistant", content: message });
     return textResponse(message);
   }
-
+  const output = (activeAgent as any).output;
+  const schema = (activeAgent as any).outputSchema;
   const finalSystemPrompt = `
 You are ${safeText(activeAgent.name) || "an AI agent"}.
 Instruction: ${resolvedInstruction || "Answer only within your configured scope."}
 Workflow rules: ${JSON.stringify(workflowRules)}
+${output === "json" && schema
+      ? `
+STRICT OUTPUT RULE (VERY IMPORTANT):
+- You MUST return ONLY valid JSON.
+- Do NOT return text, explanation, markdown, or extra words.
+- Follow this exact structure:
+
+${schema}
+
+- If you break this format, the system will fail.
+`
+      : ""
+    }
 Stay inside this scope. If user asks outside scope, refuse briefly and point back to allowed scope.
 Response policy:
 1) By default, provide a useful formatted response that includes the important fields from the tool output.
@@ -778,10 +792,10 @@ export async function GET(req: NextRequest) {
   const messages =
     agentId && userId
       ? await getConversationMemory({
-          conversationId,
-          agentId,
-          userId,
-        })
+        conversationId,
+        agentId,
+        userId,
+      })
       : [];
 
   return new Response(JSON.stringify({ conversationId, messages }), {

@@ -18,6 +18,7 @@ type AgentToolConfig = {
     model: string;
     includeHistory: boolean;
     output: string;
+    outputSchema?: Record<string, any>;
     tools: Array<{
       toolId: string;
       instruction: string;
@@ -218,6 +219,7 @@ function buildConfig(jsonConfig: Record<string, unknown>): AgentToolConfig {
       model: asString(settings.model),
       includeHistory: asBoolean(settings.includeHistory, true),
       output: asString(settings.output) || "text",
+      outputSchema: (settings.schema as Record<string, any>) || undefined,
       tools: assignedTools.map((tool) => ({
         toolId: tool.id,
         instruction: toolInstructionByToolId.get(tool.id) || "",
