@@ -28,7 +28,7 @@ export const GetConversationMessages = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const safeLimit = Math.max(1, Math.min(args.limit ?? 20, 100));
+    const safeLimit = Math.max(1, Math.min(args.limit ?? 200, 500));
 
     const rows = await ctx.db
       .query("ConversationTable")

@@ -6,6 +6,10 @@ import { ArrowUpToLine, RefreshCcwIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import rehypeHighlight from "rehype-highlight";
+import "highlight.js/styles/github.css";
 import "katex/dist/katex.min.css";
 import {
   AlertDialog,
@@ -113,7 +117,8 @@ export default function ChatUI({
   const sendMessage = async () => {
     if (!input.trim() || isStreaming || !conversationId) return;
 
-    const userMessage: UiMessage = { role: "user", text: input };
+    const messageInput = input.trim();
+    const userMessage: UiMessage = { role: "user", text: messageInput };
 
     setMessages((prev) => [...prev, userMessage, { role: "bot", text: "" }]);
 
@@ -123,8 +128,11 @@ export default function ChatUI({
     try {
       const res = await fetch("/api/agent-chat", {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          input,
+          input: messageInput,
           tools: agentDetails?.agentToolConfig?.tools || [],
           agents: agentDetails?.agentToolConfig?.agents || [],
           systemPrompt: agentDetails?.agentToolConfig?.systemPrompt || "",
@@ -138,16 +146,44 @@ export default function ChatUI({
         }),
       });
 
+      if (!res.ok) {
+        const errorText = await res.text();
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            role: "bot",
+            text: errorText || "Something went wrong. Please try again.",
+          };
+          return updated;
+        });
+        return;
+      }
+
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
+
+      if (!reader) {
+        const fallbackText = await res.text();
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            role: "bot",
+            text: fallbackText || "No response received.",
+          };
+          return updated;
+        });
+        return;
+      }
 
       let done = false;
 
       while (!done) {
-        const { value, done: doneReading } = await reader!.read();
+        const { value, done: doneReading } = await reader.read();
         done = doneReading;
 
-        const chunk = decoder.decode(value || new Uint8Array());
+        const chunk = decoder.decode(value || new Uint8Array(), {
+          stream: !doneReading,
+        });
 
         setMessages((prev) => {
           const updated = [...prev];
@@ -162,9 +198,17 @@ export default function ChatUI({
       }
     } catch (err) {
       console.error(err);
+      setMessages((prev) => {
+        const updated = [...prev];
+        updated[updated.length - 1] = {
+          role: "bot",
+          text: "Unable to reach the chat service right now. Please try again.",
+        };
+        return updated;
+      });
+    } finally {
+      setIsStreaming(false);
     }
-
-    setIsStreaming(false);
   };
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -175,7 +219,7 @@ export default function ChatUI({
 
   return (
     <div className="h-full flex flex-col bg-white text-black rounded-none sm:rounded-3xl overflow-hidden">
-      <div ref={chatRef} className="flex-1 relative overflow-y-auto">
+      <div ref={chatRef} className="flex-1 relative overflow-y-auto custom-scrollbar overflow-x-hidden">
         <div className="sticky top-0 border-gray-200 p-2 bg-linear-to-t from-transparent via-white/90 to-white">
           <div className="flex justify-between pl-3 items-center">
             <h2 className="text-lg font-semibold">{agentDetails?.name || "Agent"}</h2>
@@ -221,7 +265,7 @@ export default function ChatUI({
             </AlertDialog>
           </div>
         </div>
-        <div className="py-4 min-h-[78%] space-y-3 sm:px-4">
+        <div className="py-4 min-h-[78%] space-y-3 sm:px-4 overflow-x-hidden">
           {isLoadingHistory ? (
             <div className="flex items-center justify-center h-[60vh]">
               <span className="w-8 h-8 border-4 border-gray-300 border-t-transparent rounded-full animate-spin"></span>
@@ -235,16 +279,17 @@ export default function ChatUI({
               >
                 <div
                   className={`
-                rounded-2xl text-sm break-words
+                text-sm break-words min-w-0 overflow-hidden
                 ${msg.role === "user"
-                      ? "ml-auto px-4 py-3 max-w-[85%] sm:max-w-[70%] bg-[#e6dbff] text-black rounded-br-sm"
+                      ? "ml-auto rounded-2xl px-4 py-3 max-w-[85%] sm:max-w-[70%] bg-[#e6dbff] text-black rounded-br-sm"
                       : "max-w-[95%] sm:max-w-[85%] border-gray-200 rounded-bl-sm"
                     }
               `}
                 >
                   {msg.text || (isStreaming && i === messages.length - 1) ? (
                     <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
+                      remarkPlugins={[remarkGfm, remarkMath]}
+                      rehypePlugins={[rehypeKatex, rehypeHighlight]}
                       components={{
                         p: ({ children }) => (
                           <p className="mb-1 leading-6 last:mb-0">{children}</p>
@@ -266,9 +311,22 @@ export default function ChatUI({
                           <h3 className="text-sm font-semibold my-1">{children}</h3>
                         ),
                         strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                        code: ({ children }) => (
-                          <code className="bg-black/10 px-1 py-0.5 rounded">{children}</code>
+                        pre: ({ children }) => (
+                          <pre className="my-2 max-w-full overflow-x-hidden! custom-scrollbar rounded-xl border text-zinc-100">
+                            {children}
+                          </pre>
                         ),
+                        code: ({ children, className }) => {
+                          const isInline = !className;
+                          if (isInline) {
+                            return (
+                              <code className="bg-black/10 overflow-x-auto custom-scrollbar px-1 py-0.5 rounded break-words">
+                                {children}
+                              </code>
+                            );
+                          }
+                          return <code className={className}>{children}</code>;
+                        },
                         table: ({ children }) => (
                           <div className="my-2 w-full overflow-x-auto rounded-lg border border-gray-300">
                             <table className="w-full min-w-[420px] border-collapse text-left text-sm">

@@ -4,7 +4,7 @@ import { api } from "../../../../convex/_generated/api";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const DEFAULT_MODEL = "openrouter/free";
-const MAX_MEMORY_MESSAGES = 20;
+const MAX_MEMORY_MESSAGES = 500;
 const MAX_INPUT_LENGTH = 300;
 const FALLBACK_MODELS = [
   "openrouter/free",
@@ -42,6 +42,8 @@ type AgentConfig = {
   systemPrompt?: string;
   description?: string;
   instruction?: string;
+  output?: string;
+  outputSchema?: unknown;
 };
 
 type Decision =
@@ -371,6 +373,29 @@ function textResponse(message: string, status = 200): Response {
   });
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function streamTextResponse(message: string, status = 200): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(encoder.encode(message));
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    status,
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Accel-Buffering": "no",
+    },
+  });
+}
+
 function stringifyToolResult(value: unknown, maxChars = 12000): string {
   let text = "";
   try {
@@ -388,7 +413,7 @@ function createStreamResponse(
 ): Response {
   const reader = upstream.body?.getReader();
   if (!reader) {
-    return textResponse("I could not open response stream. Please try again.");
+    return streamTextResponse("I could not open response stream. Please try again.");
   }
 
   const decoder = new TextDecoder();
@@ -450,7 +475,11 @@ function createStreamResponse(
   });
 
   return new Response(stream, {
-    headers: { "Content-Type": "text/plain; charset=utf-8" },
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Accel-Buffering": "no",
+    },
   });
 }
 
@@ -543,7 +572,7 @@ Answer naturally according to the configured instruction.
       }
       await persistMessage(memoryContext, { role: "user", content: input });
       await persistMessage(memoryContext, { role: "assistant", content: directFallback });
-      return textResponse(directFallback);
+      return streamTextResponse(directFallback);
     }
   }
 
@@ -579,7 +608,7 @@ Reply naturally in one short response.
     }
     await persistMessage(memoryContext, { role: "user", content: input });
     await persistMessage(memoryContext, { role: "assistant", content: fallback });
-    return textResponse(fallback);
+    return streamTextResponse(fallback);
   }
 
   if (decision.type === "identity" || isIdentityQuestion(input)) {
@@ -588,7 +617,7 @@ Reply naturally in one short response.
       `I am ${safeText(activeAgent.name) || "your agent"}.`;
     await persistMessage(memoryContext, { role: "user", content: input });
     await persistMessage(memoryContext, { role: "assistant", content: identity });
-    return textResponse(identity);
+    return streamTextResponse(identity);
   }
 
   if (decision.type === "clarify") {
@@ -597,7 +626,7 @@ Reply naturally in one short response.
       "Could you share a little more detail so I can continue?";
     await persistMessage(memoryContext, { role: "user", content: input });
     await persistMessage(memoryContext, { role: "assistant", content: clarifyMessage });
-    return textResponse(clarifyMessage);
+    return streamTextResponse(clarifyMessage);
   }
 
   if (decision.type === "out_of_scope") {
@@ -620,7 +649,7 @@ Reply naturally in one short response.
     }
     await persistMessage(memoryContext, { role: "user", content: input });
     await persistMessage(memoryContext, { role: "assistant", content: response });
-    return textResponse(response);
+    return streamTextResponse(response);
   }
 
   if (decision.type === "response") {
@@ -656,14 +685,37 @@ ${suggested ? `Draft direction: ${suggested}` : ""}
       const content = suggested || buildScopeMessage(activeAgent, agentTools);
       await persistMessage(memoryContext, { role: "user", content: input });
       await persistMessage(memoryContext, { role: "assistant", content });
-      return textResponse(content);
+      return streamTextResponse(content);
     }
   }
 
+  const requestedToolName = decision.type === "tool" ? safeText(decision.tool).trim() : "";
+  if (!requestedToolName) {
+    let response = "";
+    try {
+      response = await callModelWithFallback(
+        [
+          {
+            role: "system",
+            content: `You are ${safeText(activeAgent.name) || "an AI agent"}. Reply naturally to the user based on current instructions in one short message.`,
+          },
+          ...memory,
+          { role: "user", content: input },
+        ],
+        safeText(activeAgent.model),
+      );
+    } catch {
+      response = "I can help with that. Please share a bit more detail.";
+    }
+    await persistMessage(memoryContext, { role: "user", content: input });
+    await persistMessage(memoryContext, { role: "assistant", content: response });
+    return streamTextResponse(response);
+  }
+
   const selectedTool =
-    agentTools.find((tool) => safeText(tool.name).toLowerCase() === decision.tool.toLowerCase()) ??
+    agentTools.find((tool) => safeText(tool.name).toLowerCase() === requestedToolName.toLowerCase()) ??
     agentTools.find((tool) =>
-      safeText(tool.name).toLowerCase().includes(decision.tool.toLowerCase()),
+      safeText(tool.name).toLowerCase().includes(requestedToolName.toLowerCase()),
     );
 
   if (!selectedTool) {
@@ -684,20 +736,21 @@ ${suggested ? `Draft direction: ${suggested}` : ""}
     }
     await persistMessage(memoryContext, { role: "user", content: input });
     await persistMessage(memoryContext, { role: "assistant", content: response });
-    return textResponse(response);
+    return streamTextResponse(response);
   }
 
   let toolResult: unknown;
   try {
-    toolResult = await executeTool(selectedTool, decision.params || {});
+    const toolParams = decision.type === "tool" && isRecord(decision.params) ? decision.params : {};
+    toolResult = await executeTool(selectedTool, toolParams);
   } catch {
     const message = `I am ${safeText(activeAgent.name) || "this agent"}, but I could not fetch data from "${safeText(selectedTool.name)}" right now. Please try again.`;
     await persistMessage(memoryContext, { role: "user", content: input });
     await persistMessage(memoryContext, { role: "assistant", content: message });
-    return textResponse(message);
+    return streamTextResponse(message);
   }
-  const output = (activeAgent as any).output;
-  const schema = (activeAgent as any).outputSchema;
+  const output = activeAgent.output;
+  const schema = activeAgent.outputSchema;
   const finalSystemPrompt = `
 You are ${safeText(activeAgent.name) || "an AI agent"}.
 Instruction: ${resolvedInstruction || "Answer only within your configured scope."}
@@ -773,7 +826,7 @@ Return response based on the policy above.`,
 
     await persistMessage(memoryContext, { role: "user", content: input });
     await persistMessage(memoryContext, { role: "assistant", content: finalAnswer });
-    return textResponse(finalAnswer);
+    return streamTextResponse(finalAnswer);
   }
 }
 
