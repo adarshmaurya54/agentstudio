@@ -27,9 +27,6 @@ import { LiquidGlassCard } from './ui/liquid-glass'
 
 function Navbar() {
   const [isTop, setIsTop] = useState(true)
-  const [isOpen, setIsOpen] = useState(false)
-
-  const { isLoaded, isSignedIn } = useUser()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -43,7 +40,7 @@ function Navbar() {
   return (
     <LiquidGlassCard
       blurIntensity='sm'
-      className={`${isTop ? "md:w-full border-none" : "md:w-[45rem]"} transition-all md:border shadow-none bg-white/20 duration-500 md:rounded-full md:fixed sticky top-0 md:top-3 md:left-1/2 md:-translate-x-1/2 z-20`}
+      className={`${isTop ? "w-full border-none top-0 bg-transparent" : "md:w-[45rem] top-3 w-[90%] bg-white/20"} transition-all border border-black/10 shadow-none duration-500 md:rounded-full fixed md:top-3 left-1/2 -translate-x-1/2 z-20`}
     >
       {/* <nav className={`${isTop ? "md:w-full border-none" : "backdrop-blur md:w-[45rem]"} transition-all duration-500 md:rounded-full md:fixed sticky top-0 md:top-3 md:left-1/2 md:-translate-x-1/2 z-20`}> */}
         <div className="mx-auto relative z-30 flex w-full max-w-6xl items-center justify-between px-2 py-2 sm:px-6 lg:px-3">

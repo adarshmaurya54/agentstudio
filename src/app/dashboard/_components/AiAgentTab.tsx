@@ -2,6 +2,7 @@
 import React, { useState } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import MyAgents from './MyAgents'
+import Templates from './Templates'
 function AiAgentTab() {
     const [tab, setTab] = useState("myagents");
     return (
@@ -12,7 +13,7 @@ function AiAgentTab() {
                     <TabsTrigger value="templates">Templates</TabsTrigger>
                 </TabsList>
                 <TabsContent value="myagents"><MyAgents /></TabsContent>
-                <TabsContent value="templates">Change your password here.</TabsContent>
+                <TabsContent value="templates"><Templates /></TabsContent>
             </Tabs>
         </div>
     )

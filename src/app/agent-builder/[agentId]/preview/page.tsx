@@ -122,7 +122,7 @@ function Preview() {
     return (
         <div className="h-screen relative flex flex-col">
             <Header agentDetails={agentDetails} previewOption={false} />
-            {!agentDetails?.agentToolConfig && (
+            {!agentDetails && (
                 <div className="absolute top-0 right-0 w-full h-full flex justify-center items-center backdrop-blur-md z-20">
                     <LoaderOne />
                 </div>
