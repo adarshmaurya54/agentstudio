@@ -66,9 +66,9 @@ console.log('Final response:', fullText);
                     : '/agent-builder/' + agentDetails?.agentId
                     }`}
                 className={`flex ${previewOption
-                    ? 'fixed top-3 left-3 z-20 border'
+                    ? 'fixed top-3 left-3 z-20'
                     : 'relative'
-                    } cursor-pointer items-center backdrop-blur-sm py-2 pl-1 pr-4 rounded-full`}
+                    } cursor-pointer items-center py-2 pl-1 pr-4`}
             >
                 <ChevronLeft className='w-8 h-8' />
                 <h2 className='text-lg'>{agentDetails?.name}</h2>
@@ -76,9 +76,9 @@ console.log('Final response:', fullText);
 
             <div
                 className={`flex ${previewOption
-                    ? 'fixed top-3 border right-3 z-20'
+                    ? 'fixed top-3 right-3 z-20'
                     : 'relative justify-end'
-                    } items-center gap-4 backdrop-blur-sm py-2 pl-3 pr-2 rounded-full`}
+                    } items-center gap-4 py-2 pl-3 pr-2`}
             >
 
                 {previewOption && (

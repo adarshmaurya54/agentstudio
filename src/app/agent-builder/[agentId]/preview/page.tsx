@@ -6,12 +6,12 @@ import { useConvex, useMutation } from 'convex/react';
 import { api } from '../../../../../convex/_generated/api';
 import { useParams } from 'next/navigation';
 import { Background, ReactFlow } from '@xyflow/react';
-import { nodeTypes } from '../page';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { RefreshCcwIcon } from 'lucide-react';
 import ChatUI from './_component/ChatUI';
 import { LoaderOne } from '@/components/ui/loader';
+import { nodeTypes } from '@/lib/nodeTypes';
 
 function Preview() {
     const [config, setConfig] = useState<any>();

@@ -3,8 +3,6 @@ import Header from '../_components/Header'
 import { useState, useCallback, useContext, useEffect } from 'react';
 import { ReactFlow, applyNodeChanges, applyEdgeChanges, addEdge, Background, Controls, MiniMap, Panel, useOnSelectionChange, OnSelectionChangeParams } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import StartNode from '../_customNodes/StartNode';
-import AgentNode from '../_customNodes/AgentNode';
 import AiAgentToolsPanel from '../_components/AiAgentToolsPanel';
 import { WorkflowContext } from '@/context/WorkflowContext';
 import { useConvex, useMutation } from 'convex/react';
@@ -13,23 +11,10 @@ import { useParams } from 'next/navigation';
 import { Agent } from '@/types/agentTypes';
 import { Id } from '../../../../convex/_generated/dataModel';
 import { toast } from 'sonner';
-import EndNode from '../_customNodes/EndNode';
-import IfElseNode from '../_customNodes/IfElseNode';
-import WhileNode from '../_customNodes/WhileNode';
-import ApprovalNode from '../_customNodes/ApprovalNode';
-import ApiNode from '../_customNodes/ApiNode';
 import SettingPanel from '../_components/SettingPanel';
 import { Button } from '@/components/ui/button';
-
-export const nodeTypes = {
-    StartNode: StartNode,
-    AgentNode: AgentNode,
-    EndNode: EndNode,
-    IfElseNode: IfElseNode,
-    WhileNode: WhileNode,
-    ApprovalNode: ApprovalNode,
-    ApiNode: ApiNode
-};
+import { ZoomSelect } from '@/components/zoom-select';
+import { nodeTypes } from '@/lib/nodeTypes';
 
 function AgentBuilder() {
     const { addedNodes, setAddedNodes, nodeEdges, setNodeEdges, setSelectedNode } = useContext(WorkflowContext);
@@ -46,7 +31,7 @@ function AgentBuilder() {
 
     // Load initial data
     useEffect(() => {
-        if(!agentId) return;
+        if (!agentId) return;
         console.log('Fetching details for agentId:', agentId);
         GetAgentDetails();
     }, [agentId]);
@@ -167,7 +152,11 @@ function AgentBuilder() {
     return (
         <div>
             <Header agentDetails={agentDetails} previewOption={true} />
-
+            <div className="fixed bottom-0 right-0 z-50">
+                <div className="bg-white text-xs p-2">
+                    <span>AgentStudio</span>
+                </div>
+            </div>
             <div style={{ width: '100vw', height: '100vh' }}>
                 <ReactFlow
                     nodes={nodes}
@@ -178,7 +167,7 @@ function AgentBuilder() {
                     fitView
                     nodeTypes={nodeTypes}
                 >
-                    <Controls />
+                    <ZoomSelect position="bottom-left" />
                     {/* @ts-ignore */}
                     <Background variant='dots' gap={15} size={1} />
 
