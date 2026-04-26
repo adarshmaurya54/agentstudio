@@ -218,54 +218,12 @@ export default function ChatUI({
   };
 
   return (
-    <div className="h-full flex flex-col bg-white text-black rounded-none sm:rounded-3xl overflow-hidden">
-      <div ref={chatRef} className="flex-1 relative overflow-y-auto custom-scrollbar overflow-x-hidden">
-        <div className="sticky top-0 border-gray-200 p-2 bg-linear-to-t from-transparent via-white/90 to-white">
-          <div className="flex justify-between pl-3 items-center">
-            <h2 className="text-lg font-semibold">{agentDetails?.name || "Agent"}</h2>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button className="rounded-xl text-xs" disabled={loading}>
-                  <RefreshCcwIcon className={`${loading && "animate-spin"} w-3 h-3`} />
-                  Reboot
-                </Button>
-              </AlertDialogTrigger>
-
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will permanently delete all conversation history for this agent.
-                    This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-
-                  <AlertDialogAction
-                    onClick={async () => {
-                      if (!conversationId) return;
-
-                      await deleteConversation({
-                        conversationId,
-                        agentId: agentDetails.agentId,
-                        userId: String(agentDetails.userId),
-                      });
-
-                      // reset UI
-                      setMessages([getWelcomeMessage()]);
-                      GenerateAgentToolConfig();
-                    }}
-                  >
-                    Yes, delete everything
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        </div>
-        <div className="py-4 min-h-[78%] space-y-3 sm:px-4 overflow-x-hidden">
+    <div className="relative h-full min-h-0 bg-white text-black rounded-none sm:rounded-3xl overflow-hidden">
+      <div
+        ref={chatRef}
+        className="h-full overflow-y-auto custom-scrollbar overflow-x-hidden"
+      >
+        <div className="pt-16 pb-16 min-h-full space-y-3 sm:px-4 overflow-x-hidden">
           {isLoadingHistory ? (
             <div className="flex items-center justify-center h-[60vh]">
               <span className="w-8 h-8 border-4 border-gray-300 border-t-transparent rounded-full animate-spin"></span>
@@ -363,39 +321,85 @@ export default function ChatUI({
             ))
           )}
         </div>
+        <div ref={bottomRef} />
+      </div>
 
-        <div className="sticky bottom-0 border-gray-200 p-2 bg-linear-to-t from-white via-white/30 to-transparent">
-          <div className="w-full max-w-2xl mx-auto">
-            <div className="relative p-[2px] gap-2 bg-white border border-gray-300 rounded-4xl">
-              <Textarea
-                value={input}
-                disabled={isStreaming}
-                onChange={(e) => {
-                  handleInput(e);
-                  setInput(e.target.value);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage();
-                  }
-                }}
-                placeholder="Type your message..."
-                rows={1}
-                className="flex-1 resize-none border-none px-4 pr-10 w-full shadow-none focus-visible:ring-0 bg-transparent text-sm leading-5 max-h-32 overflow-y-auto"
-              />
-
-              <Button
-                onClick={sendMessage}
-                disabled={isStreaming || !input.trim() || !conversationId}
-                className="absolute right-1 bottom-1 w-8 h-8 flex items-center justify-center rounded-full text-white shrink-0"
-              >
-                <ArrowUpToLine className="w-4 h-4" />
+      <div className="absolute top-0 left-0 right-0 z-20 p-2 bg-linear-to-t from-transparent via-white/90 to-white">
+        <div className="flex justify-between pl-3 items-center">
+          <h2 className="text-lg font-semibold">{agentDetails?.name || "Agent"}</h2>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button className="rounded-xl text-xs" disabled={loading}>
+                <RefreshCcwIcon className={`${loading && "animate-spin"} w-3 h-3`} />
+                Reboot
               </Button>
-            </div>
+            </AlertDialogTrigger>
+
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete all conversation history for this agent.
+                  This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+
+                <AlertDialogAction
+                  onClick={async () => {
+                    if (!conversationId) return;
+
+                    await deleteConversation({
+                      conversationId,
+                      agentId: agentDetails.agentId,
+                      userId: String(agentDetails.userId),
+                    });
+
+                    // reset UI
+                    setMessages([getWelcomeMessage()]);
+                    GenerateAgentToolConfig();
+                  }}
+                >
+                  Yes, delete everything
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </div>
+
+      <div className="absolute bottom-0 left-0 right-0 z-20  p-2 bg-linear-to-t from-white via-white/30 to-transparent">
+        <div className="w-full max-w-2xl mx-auto">
+          <div className="relative p-[2px] gap-2 bg-white border border-gray-300 rounded-4xl">
+            <Textarea
+              value={input}
+              disabled={isStreaming}
+              onChange={(e) => {
+                handleInput(e);
+                setInput(e.target.value);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
+              placeholder="Type your message..."
+              rows={1}
+              className="flex-1 resize-none border-none px-4 pr-10 w-full shadow-none focus-visible:ring-0 bg-transparent text-sm leading-5 max-h-32 overflow-y-auto"
+            />
+
+            <Button
+              onClick={sendMessage}
+              disabled={isStreaming || !input.trim() || !conversationId}
+              className="absolute right-1 bottom-1 w-8 h-8 flex items-center justify-center rounded-full text-white shrink-0"
+            >
+              <ArrowUpToLine className="w-4 h-4" />
+            </Button>
           </div>
         </div>
-        <div ref={bottomRef} />
       </div>
     </div>
   );
