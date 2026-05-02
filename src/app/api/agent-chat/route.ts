@@ -3,10 +3,11 @@ import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "../../../../convex/_generated/api";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_MODEL = "openrouter/free";
+const DEFAULT_MODEL = "openai/gpt-oss-120b:free";
 const MAX_MEMORY_MESSAGES = 500;
 const MAX_INPUT_LENGTH = 300;
 const FALLBACK_MODELS = [
+  "openai/gpt-oss-120b:free",
   "openrouter/free",
   "deepseek/deepseek-chat",
   "mistralai/mistral-7b-instruct",
@@ -171,6 +172,7 @@ function resolveModel(model: string): string {
     "gemini-pro-1.2": "google/gemini-pro-1.5",
     "gemini-pro-2.0": "google/gemini-2.0-pro-exp-02-05",
     "openrouter/free": "openrouter/free",
+    "openai/gpt-oss-120b:free": "openai/gpt-oss-120b:free"
   };
 
   if (modelMap[normalized]) {
