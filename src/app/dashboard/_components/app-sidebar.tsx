@@ -82,10 +82,10 @@ export function AppSidebar() {
     return (
         <Sidebar collapsible="icon">
             <SidebarHeader>
-                <div className="flex gap-3 items-center">
+                <Link href="/dashboard" className="flex gap-3 items-center">
                     <Image src="/logo.svg" alt='logo' width={32} height={32} />
                     {open && <h2 className='font-bold'>AgentStudio</h2>}
-                </div>
+                </Link>
             </SidebarHeader>
             <SidebarContent>
                 <SidebarGroup >
