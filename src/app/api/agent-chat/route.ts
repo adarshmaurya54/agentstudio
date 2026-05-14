@@ -3,11 +3,15 @@ import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "../../../../convex/_generated/api";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_MODEL = "openai/gpt-oss-120b:free";
+const DEFAULT_MODEL = "openrouter/free";
 const MAX_MEMORY_MESSAGES = 500;
+const MAX_CONTEXT_MESSAGES = 40;
+const MAX_CONTEXT_CHARS = 24000;
+const SUMMARY_TRIGGER_MESSAGES = 60;
+const MAX_SUMMARY_SOURCE_MESSAGES = 300;
+const MAX_SUMMARY_CHARS = 2000;
 const MAX_INPUT_LENGTH = 300;
 const FALLBACK_MODELS = [
-  "openai/gpt-oss-120b:free",
   "openrouter/free",
   "deepseek/deepseek-chat",
   "mistralai/mistral-7b-instruct",
@@ -55,6 +59,7 @@ type Decision =
   | { type: "response"; content: string };
 
 const memoryStore = new Map<string, ChatMessage[]>();
+const summaryStore = new Map<string, { sourceCount: number; summary: string }>();
 
 function getMemory(conversationId: string): ChatMessage[] {
   return memoryStore.get(conversationId) ?? [];
@@ -172,7 +177,6 @@ function resolveModel(model: string): string {
     "gemini-pro-1.2": "google/gemini-pro-1.5",
     "gemini-pro-2.0": "google/gemini-2.0-pro-exp-02-05",
     "openrouter/free": "openrouter/free",
-    "openai/gpt-oss-120b:free": "openai/gpt-oss-120b:free"
   };
 
   if (modelMap[normalized]) {
@@ -379,6 +383,118 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
+function prepareMemoryForContext(memory: ChatMessage[]): ChatMessage[] {
+  const valid = memory.filter(
+    (msg) =>
+      (msg.role === "system" || msg.role === "user" || msg.role === "assistant") &&
+      typeof msg.content === "string" &&
+      msg.content.trim().length > 0,
+  );
+
+  const recent = valid.slice(-MAX_CONTEXT_MESSAGES);
+  let totalChars = 0;
+  const packed: ChatMessage[] = [];
+
+  for (let i = recent.length - 1; i >= 0; i -= 1) {
+    const msg = recent[i];
+    if (totalChars + msg.content.length > MAX_CONTEXT_CHARS) {
+      break;
+    }
+    packed.push(msg);
+    totalChars += msg.content.length;
+  }
+
+  return packed.reverse();
+}
+
+function buildContextualUserInput(input: string, memory: ChatMessage[]): string {
+  const trimmed = input.trim();
+  if (!trimmed) return "";
+
+  if (trimmed.length > 24) return trimmed;
+  if (/\s/.test(trimmed) && trimmed.length > 12) return trimmed;
+
+  const lastAssistantQuestion = [...memory]
+    .reverse()
+    .find(
+      (msg) =>
+        msg.role === "assistant" &&
+        typeof msg.content === "string" &&
+        msg.content.trim().length > 0 &&
+        /\?/.test(msg.content),
+    );
+
+  if (!lastAssistantQuestion) {
+    return trimmed;
+  }
+
+  return `Context: Assistant previously asked: "${lastAssistantQuestion.content.trim()}". User's short reply to that question: "${trimmed}".`;
+}
+
+async function getConversationSummary(
+  conversationId: string,
+  memory: ChatMessage[],
+  preferredModel: string,
+): Promise<string> {
+  if (memory.length < SUMMARY_TRIGGER_MESSAGES) {
+    return "";
+  }
+
+  const overflow = memory
+    .slice(0, -MAX_CONTEXT_MESSAGES)
+    .slice(-MAX_SUMMARY_SOURCE_MESSAGES)
+    .filter(
+      (msg) =>
+        (msg.role === "user" || msg.role === "assistant") &&
+        typeof msg.content === "string" &&
+        msg.content.trim().length > 0,
+    );
+
+  if (overflow.length === 0) {
+    return "";
+  }
+
+  const cached = summaryStore.get(conversationId);
+  if (cached && cached.sourceCount === overflow.length && cached.summary) {
+    return cached.summary;
+  }
+
+  const summaryPrompt = `
+You summarize chat history for an assistant memory block.
+Return plain text only.
+Capture durable facts and decisions:
+- user goals and preferences
+- important entities, numbers, constraints
+- what has already been asked/answered
+- unresolved questions or next step
+Do not invent facts.
+Keep it concise (max ${MAX_SUMMARY_CHARS} chars).
+`.trim();
+
+  const overflowText = overflow
+    .map((msg) => `${msg.role.toUpperCase()}: ${msg.content}`)
+    .join("\n");
+
+  try {
+    const summaryRaw = await callModelWithFallback(
+      [
+        { role: "system", content: summaryPrompt },
+        { role: "user", content: overflowText },
+      ],
+      preferredModel,
+    );
+    const summary = summaryRaw.trim().slice(0, MAX_SUMMARY_CHARS);
+    if (!summary) return "";
+    summaryStore.set(conversationId, {
+      sourceCount: overflow.length,
+      summary,
+    });
+    return summary;
+  } catch {
+    return "";
+  }
+}
+
 function streamTextResponse(message: string, status = 200): Response {
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -532,6 +648,19 @@ export async function POST(req: NextRequest) {
     userId,
   };
   const memory = includeHistory ? await getConversationMemory(memoryContext) : [];
+  const contextMemory = includeHistory ? prepareMemoryForContext(memory) : [];
+  const contextualInput = buildContextualUserInput(input, contextMemory);
+  const conversationSummary = includeHistory
+    ? await getConversationSummary(conversationId, memory, safeText(activeAgent.model))
+    : "";
+  const summaryMessage: ChatMessage[] = conversationSummary
+    ? [
+      {
+        role: "system",
+        content: `Conversation summary (older context): ${conversationSummary}`,
+      },
+    ]
+    : [];
   const resolvedInstruction = getAgentInstruction(activeAgent, globalSystemPrompt);
 
   // Generic no-tool agents should still work fully from prompt/instruction.
@@ -546,8 +675,9 @@ Workflow rules: ${JSON.stringify(workflowRules)}
 Answer naturally according to the configured instruction.
 `.trim(),
       },
-      ...(includeHistory ? memory : []),
-      { role: "user", content: input },
+      ...summaryMessage,
+      ...contextMemory,
+      { role: "user", content: contextualInput },
     ];
 
     try {
@@ -581,8 +711,8 @@ Answer naturally according to the configured instruction.
   let decision: Decision | null = null;
   try {
     decision = await decideAction(
-      input,
-      memory,
+      contextualInput,
+      contextMemory,
       activeAgent,
       agentTools,
       workflowRules,
@@ -596,7 +726,7 @@ Answer naturally according to the configured instruction.
     const fallbackPrompt = `
 You are ${safeText(activeAgent.name) || "an AI agent"}.
 Instructions: ${resolvedInstruction}
-User message: ${input}
+User message: ${contextualInput}
 Reply naturally in one short response.
 `.trim();
     let fallback = "";
@@ -641,7 +771,7 @@ Reply naturally in one short response.
               role: "system",
               content: `You are ${safeText(activeAgent.name) || "an AI agent"}. Politely explain this question is out of scope in one short sentence.`,
             },
-            { role: "user", content: input },
+            { role: "user", content: contextualInput },
           ],
           safeText(activeAgent.model),
         );
@@ -667,8 +797,9 @@ Respond naturally for this user message.
 ${suggested ? `Draft direction: ${suggested}` : ""}
 `.trim(),
       },
-      ...(includeHistory ? memory : []),
-      { role: "user", content: input },
+      ...summaryMessage,
+      ...contextMemory,
+      { role: "user", content: contextualInput },
     ];
 
     try {
@@ -701,8 +832,9 @@ ${suggested ? `Draft direction: ${suggested}` : ""}
             role: "system",
             content: `You are ${safeText(activeAgent.name) || "an AI agent"}. Reply naturally to the user based on current instructions in one short message.`,
           },
-          ...memory,
-          { role: "user", content: input },
+          ...summaryMessage,
+          ...contextMemory,
+          { role: "user", content: contextualInput },
         ],
         safeText(activeAgent.model),
       );
@@ -729,7 +861,7 @@ ${suggested ? `Draft direction: ${suggested}` : ""}
             role: "system",
             content: `You are ${safeText(activeAgent.name) || "an AI agent"}. The required tool is unavailable. Ask user to rephrase or try again in one short line.`,
           },
-          { role: "user", content: input },
+          { role: "user", content: contextualInput },
         ],
         safeText(activeAgent.model),
       );
@@ -789,10 +921,11 @@ Style policy:
 
   const finalMessages: ChatMessage[] = [
     { role: "system", content: finalSystemPrompt },
-    ...(includeHistory ? memory : []),
+    ...summaryMessage,
+    ...contextMemory,
     {
       role: "user",
-      content: `User message: ${input}
+      content: `User message: ${contextualInput}
 
 Tool (${safeText(selectedTool.name)}) output:
 ${stringifyToolResult(toolResult)}

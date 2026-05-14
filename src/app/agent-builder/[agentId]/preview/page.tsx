@@ -12,6 +12,7 @@ import { RefreshCcwIcon } from 'lucide-react';
 import ChatUI from './_component/ChatUI';
 import { LoaderOne } from '@/components/ui/loader';
 import { nodeTypes } from '@/lib/nodeTypes';
+import '@xyflow/react/dist/style.css';
 
 function Preview() {
     const [config, setConfig] = useState<any>();
