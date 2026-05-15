@@ -3,16 +3,18 @@ import React from 'react'
 
 function PricingPage() {
     return (
-        <div className='space-y-5 py-10' style={{ maxWidth: '800px', margin: '0 auto' }}>
-            <h2 className='text-center block font-bold text-2xl'>Pricing</h2>
-            <div className="pricing-wrapper p-4">
-                <PricingTable
-                    appearance={{
-                        variables: {
-                            borderRadius: "16px",
-                        },
-                    }}
-                />
+        <div className='bg-sidebar px-3 md:pb-0 pb-3 h-[90%]'>
+            <div className="px-3 h-full space-y-4 bg-white rounded-4xl p-6 border">
+                <h2 className='text-center block font-bold text-2xl'>Pricing</h2>
+                <div className="pricing-wrapper">
+                    <PricingTable
+                        appearance={{
+                            variables: {
+                                borderRadius: "10px",
+                            },
+                        }}
+                    />
+                </div>
             </div>
         </div>
     )

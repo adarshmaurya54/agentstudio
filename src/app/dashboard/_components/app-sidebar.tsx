@@ -80,7 +80,7 @@ export function AppSidebar() {
         setUserDetail((prev: any) => ({...prev, remainingCredits: 4 - Number(result?.length || 0)}))
     }
     return (
-        <Sidebar collapsible="icon">
+        <Sidebar collapsible="icon" className="border-none">
             <SidebarHeader>
                 <Link href="/dashboard" className="flex gap-3 items-center">
                     <Image src="/logo.svg" alt='logo' width={32} height={32} />
