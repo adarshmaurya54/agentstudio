@@ -6,7 +6,7 @@ import Templates from './Templates'
 function AiAgentTab() {
     const [tab, setTab] = useState("myagents");
     return (
-        <div className='md:px-0 w-full px-10  mt-14'>
+        <div className='md:px-10 w-full px-3  mt-14'>
             <Tabs value={tab} onValueChange={setTab}>
                 <TabsList>
                     <TabsTrigger value="myagents">My Agents</TabsTrigger>

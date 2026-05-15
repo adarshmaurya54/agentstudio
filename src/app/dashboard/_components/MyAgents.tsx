@@ -131,7 +131,7 @@ function MyAgents() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder='Search agents...'
-          className='pl-9'
+          className='pl-9 rounded-xl'
           aria-label='Search agents'
         />
       </div>
