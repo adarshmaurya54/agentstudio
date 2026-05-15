@@ -12,7 +12,7 @@ function AppHeader() {
   }, []);
 
   return (
-    <div className="flex items-center justify-between w-full px-5 py-2 bg-sidebar">
+    <div className="flex items-center justify-between w-full px-5 py-2 bg-sidebar h-[10%]">
       <SidebarTrigger />
       {mounted && <UserButton />}
     </div>

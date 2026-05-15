@@ -3,13 +3,17 @@ import React from 'react'
 
 function Profile() {
   return (
-    <div className='flex items-center bg-sidebar justify-center'>
-      <div className="profile-container">
-        <UserProfile routing="hash"
+    <div className="flex items-center justify-center h-screen w-full">
+      <div className="w-full h-full profile-container">
+        <UserProfile
+          routing="hash"
           appearance={{
             variables: {
-              width: "100%",
-              borderRadius: "16px",
+              borderRadius: "9px",
+            },
+            elements: {
+              rootBox: "w-full h-full",
+              card: "w-full h-full shadow-none border rounded-2xl",
             },
           }}
         />

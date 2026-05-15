@@ -201,9 +201,15 @@
 .cl-internal-1dauvpw, .cl-internal-l2l775{
   display: none !important;
 }
-.auth-container .cl-cardBox, .profile-container .cl-cardBox {
+.auth-container .cl-cardBox {
   box-shadow: none !important;
   border: 1.5px solid rgba(0, 0, 0, 0.064) !important;
+}
+
+.profile-container .cl-cardBox{
+  border: none !important;
+  box-shadow: none !important;
+  /* width: 65rem !important; */
 }
 
 .bg-sidebar2{
