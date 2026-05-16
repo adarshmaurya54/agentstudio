@@ -296,6 +296,62 @@ function buildConfig(jsonConfig: Record<string, unknown>): AgentToolConfig {
     }
   }
 
+  for (const node of orderedNodes) {
+    if (node.type !== "ApprovalNode") continue;
+
+    const settings = (node.settings ?? {}) as Record<string, unknown>;
+    const approvalName = getNodeName(node) || "approval";
+    const approvalMessage = asString(settings.message);
+    const next = (node.next ?? {}) as Record<string, unknown>;
+    const approveTarget = asString(next.approve);
+    const rejectTarget = asString(next.reject);
+
+    if (approvalMessage) {
+      workflowRules.push(
+        `Before continuing, ask for user approval at "${approvalName}" with message: ${approvalMessage}`,
+      );
+    } else {
+      workflowRules.push(
+        `Before continuing, ask for user approval at "${approvalName}" and proceed only after explicit approval.`,
+      );
+    }
+
+    if (approveTarget) {
+      const approveNode = orderedNodeMap.get(approveTarget);
+      const approveNodeName = getNodeName(approveNode ?? { id: "" });
+      const approveTargetLabel =
+        approveNodeName || asString(approveNode?.type) || approveTarget;
+      workflowRules.push(
+        `If approved, continue to "${approveTargetLabel}".`,
+      );
+    } else {
+      workflowRules.push(
+        "If approved, continue with the next workflow step.",
+      );
+    }
+
+    if (rejectTarget) {
+      const rejectNode = orderedNodeMap.get(rejectTarget);
+      if (rejectNode?.type === "EndNode") {
+        const rejectEndMessage = asString(
+          ((rejectNode.settings ?? {}) as Record<string, unknown>).schema,
+        );
+        workflowRules.push(
+          rejectEndMessage
+            ? `If rejected, end flow and reply exactly: ${rejectEndMessage}`
+            : "If rejected, end flow politely.",
+        );
+      } else {
+        const rejectNodeName = getNodeName(rejectNode ?? { id: "" });
+        const rejectTargetLabel =
+          rejectNodeName || asString(rejectNode?.type) || rejectTarget;
+        workflowRules.push(`If rejected, go to "${rejectTargetLabel}".`);
+      }
+    } else {
+      workflowRules.push("If rejected, do not fetch details and end flow.");
+    }
+  }
+
   return {
     systemPrompt,
     primaryAgentName,

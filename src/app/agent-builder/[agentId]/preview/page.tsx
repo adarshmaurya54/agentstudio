@@ -53,8 +53,20 @@ function Preview() {
             const connectedEdges = edgeMap[node.id] || [];
             let next: any = null;
 
-            if (connectedEdges.length === 1) next = connectedEdges[0].target;
-            else if (connectedEdges.length > 1) next = connectedEdges.map((e: any) => e.target);
+            if (connectedEdges.length === 1) {
+                next = connectedEdges[0].target;
+            } else if (connectedEdges.length > 1) {
+                const hasBranchHandles = connectedEdges.some((e: any) => !!e.sourceHandle);
+                if (hasBranchHandles) {
+                    next = connectedEdges.reduce((acc: any, edge: any) => {
+                        const key = edge.sourceHandle || `next${Object.keys(acc).length + 1}`;
+                        acc[key] = edge.target;
+                        return acc;
+                    }, {});
+                } else {
+                    next = connectedEdges.map((e: any) => e.target);
+                }
+            }
 
             return {
                 id: node.id,

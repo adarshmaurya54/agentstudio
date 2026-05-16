@@ -5,12 +5,12 @@ import { api } from "../../../../convex/_generated/api";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const DEFAULT_MODEL = "openrouter/free";
 const MAX_MEMORY_MESSAGES = 500;
-const MAX_CONTEXT_MESSAGES = 40;
-const MAX_CONTEXT_CHARS = 24000;
+const MAX_CONTEXT_MESSAGES = 120;
+const MAX_CONTEXT_CHARS = 120000;
 const SUMMARY_TRIGGER_MESSAGES = 60;
 const MAX_SUMMARY_SOURCE_MESSAGES = 300;
 const MAX_SUMMARY_CHARS = 2000;
-const MAX_INPUT_LENGTH = 300;
+const MAX_INPUT_LENGTH = 4000;
 const FALLBACK_MODELS = [
   "openrouter/free",
   "deepseek/deepseek-chat",
@@ -383,6 +383,73 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
+function getRequiredUrlParamKeys(url: string): string[] {
+  const matches = [...url.matchAll(/\{([^}]+)\}/g)];
+  return matches
+    .map((match) => safeText(match[1]).trim())
+    .filter(Boolean);
+}
+
+function isMissingValue(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value === "string" && value.trim().length === 0) return true;
+  return false;
+}
+
+function extractLikelyCityFromText(text: string): string {
+  const normalized = text.trim();
+  if (!normalized) return "";
+
+  const inMatch = normalized.match(
+    /\b(?:in|for|at)\s+([A-Za-z][A-Za-z\s.'-]{1,60})(?:\s+(?:weather|forecast|temperature)\b|[?.!,]|$)/i,
+  );
+  if (inMatch?.[1]) {
+    return inMatch[1].trim();
+  }
+
+  const leadingPlace = normalized.match(
+    /^([A-Za-z][A-Za-z\s.'-]{1,60}(?:,\s*[A-Za-z][A-Za-z\s.'-]{1,60})?)\s+(?:weather|forecast|temperature)\b/i,
+  );
+  if (leadingPlace?.[1]) {
+    return leadingPlace[1].trim();
+  }
+
+  return "";
+}
+
+function recoverParamsFromMemoryHeuristic(
+  tool: Tool,
+  params: Record<string, unknown>,
+  input: string,
+  memory: ChatMessage[],
+): Record<string, unknown> {
+  const nextParams: Record<string, unknown> = { ...params };
+  const requiredKeys = getRequiredUrlParamKeys(safeText(tool.url));
+  if (!requiredKeys.length) return nextParams;
+
+  const userTexts = [...memory]
+    .filter((msg) => msg.role === "user")
+    .map((msg) => msg.content);
+  const candidates = [input, ...userTexts.slice(-20).reverse()];
+
+  for (const key of requiredKeys) {
+    if (!isMissingValue(nextParams[key])) continue;
+
+    const isCityKey = /(city|cityname|location|place|town)/i.test(key);
+    if (!isCityKey) continue;
+
+    for (const text of candidates) {
+      const city = extractLikelyCityFromText(text);
+      if (city) {
+        nextParams[key] = city;
+        break;
+      }
+    }
+  }
+
+  return nextParams;
+}
+
 function prepareMemoryForContext(memory: ChatMessage[]): ChatMessage[] {
   const valid = memory.filter(
     (msg) =>
@@ -753,6 +820,76 @@ Reply naturally in one short response.
   }
 
   if (decision.type === "clarify") {
+    const fallbackTool = agentTools[0];
+    if (fallbackTool) {
+      const recoveredParams = recoverParamsFromMemoryHeuristic(
+        fallbackTool,
+        {},
+        contextualInput,
+        contextMemory,
+      );
+      const requiredKeys = getRequiredUrlParamKeys(safeText(fallbackTool.url));
+      const allResolved = requiredKeys.every((key) => !isMissingValue(recoveredParams[key]));
+
+      if (allResolved) {
+        try {
+          const toolResult = await executeTool(fallbackTool, recoveredParams);
+          const output = activeAgent.output;
+          const schema = activeAgent.outputSchema;
+          const finalSystemPrompt = `
+You are ${safeText(activeAgent.name) || "an AI agent"}.
+Instruction: ${resolvedInstruction || "Answer only within your configured scope."}
+Workflow rules: ${JSON.stringify(workflowRules)}
+${output === "json" && schema
+              ? `
+STRICT OUTPUT RULE (VERY IMPORTANT):
+- You MUST return ONLY valid JSON.
+- Do NOT return text, explanation, markdown, or extra words.
+- Follow this exact structure:
+
+${schema}
+
+- If you break this format, the system will fail.
+`
+              : ""
+            }
+Return a concise, helpful answer using the tool result.
+`.trim();
+
+          const finalMessages: ChatMessage[] = [
+            { role: "system", content: finalSystemPrompt },
+            ...summaryMessage,
+            ...contextMemory,
+            {
+              role: "user",
+              content: `User message: ${contextualInput}
+
+Tool (${safeText(fallbackTool.name)}) output:
+${stringifyToolResult(toolResult)}
+
+Return response based on the policy above.`,
+            },
+          ];
+
+          const upstream = await callModelStreamWithFallback(
+            finalMessages,
+            safeText(activeAgent.model),
+          );
+          await persistMessage(memoryContext, { role: "user", content: input });
+          return createStreamResponse(upstream, async (fullText) => {
+            await persistMessage(memoryContext, {
+              role: "assistant",
+              content:
+                fullText ||
+                `I am ${safeText(activeAgent.name) || "this agent"}. I retrieved the data.`,
+            });
+          });
+        } catch {
+          // If recovery-based execution fails, continue with normal clarify response.
+        }
+      }
+    }
+
     const clarifyMessage =
       safeText(decision.message) ||
       "Could you share a little more detail so I can continue?";
@@ -875,7 +1012,14 @@ ${suggested ? `Draft direction: ${suggested}` : ""}
 
   let toolResult: unknown;
   try {
-    const toolParams = decision.type === "tool" && isRecord(decision.params) ? decision.params : {};
+    const baseParams =
+      decision.type === "tool" && isRecord(decision.params) ? decision.params : {};
+    const toolParams = recoverParamsFromMemoryHeuristic(
+      selectedTool,
+      baseParams,
+      contextualInput,
+      contextMemory,
+    );
     toolResult = await executeTool(selectedTool, toolParams);
   } catch {
     const message = `I am ${safeText(activeAgent.name) || "this agent"}, but I could not fetch data from "${safeText(selectedTool.name)}" right now. Please try again.`;
