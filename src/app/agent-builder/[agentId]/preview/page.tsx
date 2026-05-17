@@ -143,17 +143,17 @@ function Preview() {
             <div className="flex flex-1 overflow-hidden p-2 sm:p-5 flex-col">
 
                 {/* 🔥 MOBILE TOGGLE */}
-                <div className="flex sm:hidden mb-2 bg-gray-100 rounded-xl p-1">
+                <div className="flex sm:hidden mb-2 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
                     <button
                         onClick={() => setActiveView("preview")}
-                        className={`flex-1 py-1 text-sm rounded-lg ${activeView === "preview" ? "bg-white shadow" : ""
+                        className={`flex-1 py-1 text-sm rounded-lg ${activeView === "preview" ? "bg-white dark:bg-black shadow" : ""
                             }`}
                     >
                         Preview
                     </button>
                     <button
                         onClick={() => setActiveView("chat")}
-                        className={`flex-1 py-1 text-sm rounded-lg ${activeView === "chat" ? "bg-white shadow" : ""
+                        className={`flex-1 py-1 text-sm rounded-lg ${activeView === "chat" ? "bg-white dark:bg-black shadow" : ""
                             }`}
                     >
                         Chat

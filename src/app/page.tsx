@@ -35,17 +35,17 @@ const features = [
 
 const steps = [
   {
-    title: "1. Design workflow with nodes",
+    title: "Design workflow with nodes",
     description:
       "Drag and drop nodes to define each step, including AI processing, API calls, and conditions.",
   },
   {
-    title: "2. Preview in chat",
+    title: "Preview in chat",
     description:
       "Run your agent in the chat preview to validate responses and tune logic before publishing.",
   },
   {
-    title: "3. Publish and integrate",
+    title: "Publish and integrate",
     description:
       "Publish the agent to generate an SDK, then connect it to your external product or service.",
   },
@@ -53,15 +53,16 @@ const steps = [
 
 export default function HomePage() {
   return (
-    <div className="bg-[url('/blur-bg.png')] md:bg-[center_30px] bg-[center_100px] relative min-h-screen bg-no-repeat md:bg-cover bg-contain text-foreground overflow-x-hidden">
-      <header className="py-10">
+    <div className="relative min-h-screen bg-no-repeat md:bg-cover bg-contain text-foreground overflow-x-hidden bg-gradient-to-br from-transparent via-[#8b5cf6]/5 to-transparent dark:from-transparent dark:via-[#8b5cf6]/10 dark:to-transparent">
+      <div className="absolute top-0 inset-0 bg-[url('/blur-bg.png')] dark:bg-[url('/blur-bg.jpg')] bg-[center] bg-no-repeat bg-cover pointer-events-none"></div>
+      <header className="py-10 relative z-10">
         <Navbar />
       </header>
 
-      <main className="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6 lg:px-8">
+      <main className="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6 lg:px-8 relative  z-5">
         <section className="mx-auto max-w-3xl text-center">
-          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[#8b5cf6]/30 bg-[#8b5cf6]/10 px-3 py-1 text-xs text-[#6d28d9]">
-            <Bot className="size-3.5 text-[#8b5cf6]" />
+          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[#8b5cf6]/30 bg-[#8b5cf6]/10 px-3 py-1 text-xs text-[#6d28d9] dark:text-[#d8b4fe]">
+            <Bot className="size-3.5 text-[#8b5cf6] dark:text-[#b393fe]" />
             AI Agent Builder
           </div>
           <h1 className="mt-6 text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
@@ -82,7 +83,7 @@ export default function HomePage() {
               asChild
               variant="outline"
               size="lg"
-              className="border-[#8b5cf6]/30 rounded-full text-[#6d28d9] hover:bg-[#8b5cf6]/10 hover:text-[#6d28d9]"
+              className="border-[#8b5cf6]/30 rounded-full text-[#6d28d9] dark:text-[#d8b4fe] hover:bg-[#8b5cf6]/10 hover:text-[#6d28d9]"
             >
               <Link href="#how-it-works">How It Works</Link>
             </Button>
@@ -115,10 +116,10 @@ export default function HomePage() {
             A simple three-step path from workflow design to SDK integration.
           </p>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
-            {steps.map((step) => (
+            {steps.map((step, index) => (
               <Card key={step.title} className="rounded-3xl ring-[0.5px] ring-[#8b5cf6]/10 border-none">
                 <CardHeader>
-                  <CardTitle className="text-base text-[#be185d]">{step.title}</CardTitle>
+                  <CardTitle className="text-base"><span className="text-[#8b5cf6] inline-block me-3">{index + 1}.</span> {step.title}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">{step.description}</p>

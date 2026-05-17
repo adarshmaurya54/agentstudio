@@ -5,6 +5,7 @@ import { ConvexClientProvider } from "./ConvexClientProvider";
 import { ClerkProvider } from "@clerk/nextjs";
 import Provider from "./Provider";
 import { Toaster } from "sonner";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 export const metadata: Metadata = {
   title: "AgentStudio",
@@ -22,13 +23,16 @@ export default function RootLayout({
     <ClerkProvider>
       <html
         lang="en"
+        suppressHydrationWarning
       >
         <body className={outfit.className}>
           <ConvexClientProvider>
-            <Provider>
-              {children}
-              <Toaster/>
-            </Provider>
+            <ThemeProvider>
+              <Provider>
+                {children}
+                <Toaster/>
+              </Provider>
+            </ThemeProvider>
           </ConvexClientProvider>
         </body>
       </html>

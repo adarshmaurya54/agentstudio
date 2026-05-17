@@ -70,7 +70,7 @@ console.log('Final response:', fullText);
                     : 'relative'
                     } cursor-pointer items-center py-2 pl-1 pr-4`}
             >
-                <ChevronLeft className='w-8 h-8' />
+                <ChevronLeft className='w-6 h-6' />
                 <h2 className='text-lg'>{agentDetails?.name}</h2>
             </Link>
 
@@ -110,7 +110,7 @@ console.log('Final response:', fullText);
                                     {copied ? 'Copied' : 'Copy'}
                                 </Button>
                             </div>
-                            <pre className='text-xs sm:text-sm p-3 sm:p-4 overflow-auto max-h-[65vh] bg-slate-50'>
+                            <pre className='text-xs sm:text-sm p-3 sm:p-4 overflow-auto max-h-[65vh] bg-slate-50 dark:bg-slate-800'>
                                 <code>{sdkCode}</code>
                             </pre>
                         </div>

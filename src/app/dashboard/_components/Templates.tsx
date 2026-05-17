@@ -67,7 +67,7 @@ function Templates() {
     <div className='mt-5'>
       <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3'>
         {AGENT_TEMPLATES.map((template) => (
-          <div key={template.id} className='border rounded-2xl p-4 bg-white flex flex-col justify-between gap-5'>
+          <div key={template.id} className='border rounded-2xl p-4 bg-card flex flex-col justify-between gap-5'>
             <div className='space-y-3'>
               <div className='flex items-center justify-between'>
                 <Sparkles className='bg-purple-100 p-2 h-8 w-8 rounded-md' />

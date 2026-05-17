@@ -153,7 +153,7 @@ function AgentBuilder() {
         <div>
             <Header agentDetails={agentDetails} previewOption={true} />
             <div className="fixed bottom-0 right-0 z-50">
-                <div className="bg-white text-xs p-2">
+                <div className="bg-card text-xs p-2">
                     <span>AgentStudio</span>
                 </div>
             </div>
@@ -181,25 +181,16 @@ function AgentBuilder() {
                     </Panel>
 
                     {/* bottom */}
-                    <Panel position='bottom-center' style={{ bottom: 18, }}>
+                    <Panel position='bottom-center' style={{ bottom: 5, }}>
                         <div
                             className={` relative
-                                flex items-center gap-3 border border-gray-200 bg-white/60 backdrop-blur-md
+                                flex items-center gap-3 border border-gray-200 dark:border-gray-600 bg-white/60 dark:bg-black/20 backdrop-blur-md
                                 px-2 py-2 rounded-full
                                 transition-all duration-500 ease-in-out
                                 ${isDirty ? "max-w-xs" : "max-w-[79px]"}
                             `}
                             style={{ width: "max-content" }}
                         >
-                            <div
-                                className={`
-                                    absolute text-nowrap text-[10px] -bottom-7 left-1/2 -translate-x-1/2 w-fit bg-white p-1 rounded-full
-                                    transition-all duration-300 ease-in-out
-                                    ${isDirty ? "opacity-100 scale-100" : "opacity-0 scale-75 pointer-events-none"}
-                                    `}
-                            >
-                                unsaved changes
-                            </div>
                             <Button
                                 onClick={saveNodesAndEdges}
                                 disabled={isSaving || !isDirty}

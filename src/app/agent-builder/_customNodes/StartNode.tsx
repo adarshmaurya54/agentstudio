@@ -5,8 +5,8 @@ import React from 'react'
 function StartNode({selected}: any) {
   return (
      <div
-      className={`bg-white pl-2 pr-3 py-2 rounded-2xl border transition-all
-        ${selected ? 'border-black/50' : 'border-gray-300'}
+      className={`bg-card pl-2 pr-3 py-2 rounded-2xl border transition-all
+        ${selected ? 'border-foreground/50 dark:border-foreground/40' : 'border-border'}
       `}
     >
       <div className='flex items-center gap-3'>

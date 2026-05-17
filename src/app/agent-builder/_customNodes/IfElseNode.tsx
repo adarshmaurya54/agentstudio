@@ -9,8 +9,8 @@ const handleStyle = {
 function IfElseNode({ selected, data }: any) {
     return (
         <div
-            className={`bg-white px-2 py-2 rounded-2xl border transition-all
-        ${selected ? 'border-black/50' : 'border-gray-300'}
+            className={`bg-card px-2 py-2 rounded-2xl border transition-all
+        ${selected ? 'border-foreground/50 dark:border-foreground/40' : 'border-border'}
       `}
         >
             <div className='flex items-center gap-3'>

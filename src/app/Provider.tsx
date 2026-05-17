@@ -43,9 +43,7 @@ function Provider({
         <UserDetailContext.Provider value={{ userDetail, setUserDetail }}>
             <ReactFlowProvider>
                 <WorkflowContext.Provider value={{ addedNodes, setAddedNodes, nodeEdges, setNodeEdges, selectedNode, setSelectedNode }}>
-                    <div>
                         {children}
-                    </div>
                 </WorkflowContext.Provider>
             </ReactFlowProvider>
         </UserDetailContext.Provider>

@@ -218,7 +218,7 @@ export default function ChatUI({
   };
 
   return (
-    <div className="relative h-full min-h-0 bg-white text-black rounded-none sm:rounded-3xl overflow-hidden">
+    <div className="relative h-full min-h-0 bg-background text-foreground rounded-none sm:rounded-3xl overflow-hidden">
       <div
         ref={chatRef}
         className="h-full overflow-y-auto custom-scrollbar overflow-x-hidden"
@@ -239,8 +239,8 @@ export default function ChatUI({
                   className={`
                 text-sm break-words min-w-0 overflow-hidden
                 ${msg.role === "user"
-                      ? "ml-auto rounded-2xl px-4 py-3 max-w-[85%] sm:max-w-[70%] bg-[#e6dbff] text-black rounded-br-sm"
-                      : "max-w-[95%] sm:max-w-[85%] border-gray-200 rounded-bl-sm"
+                      ? "ml-auto rounded-2xl px-4 py-3 max-w-[85%] sm:max-w-[70%] bg-[#e6dbff] dark:bg-gray-600 dark:text-white rounded-br-sm"
+                      : "max-w-[95%] sm:max-w-[85%] border-gray-200 dark:border-gray-600 rounded-bl-sm"
                     }
               `}
                 >
@@ -270,7 +270,7 @@ export default function ChatUI({
                         ),
                         strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
                         pre: ({ children }) => (
-                          <pre className="my-2 max-w-full overflow-x-hidden! custom-scrollbar rounded-xl border text-zinc-100">
+                          <pre className="my-2 max-w-full overflow-x-hidden! custom-scrollbar rounded-xl border text-zinc-100 code-response">
                             {children}
                           </pre>
                         ),
@@ -278,7 +278,7 @@ export default function ChatUI({
                           const isInline = !className;
                           if (isInline) {
                             return (
-                              <code className="bg-black/10 overflow-x-auto custom-scrollbar px-1 py-0.5 rounded break-words">
+                              <code className="bg-black/10 dark:bg-gray-600 overflow-x-auto custom-scrollbar px-1 py-0.5 rounded break-words">
                                 {children}
                               </code>
                             );
@@ -292,7 +292,7 @@ export default function ChatUI({
                             </table>
                           </div>
                         ),
-                        thead: ({ children }) => <thead className="bg-gray-200/70">{children}</thead>,
+                        thead: ({ children }) => <thead className="bg-gray-200/70 dark:bg-gray-600">{children}</thead>,
                         tbody: ({ children }) => <tbody>{children}</tbody>,
                         tr: ({ children }) => <tr className="border-t border-gray-300">{children}</tr>,
                         th: ({ children }) => (
@@ -324,7 +324,7 @@ export default function ChatUI({
         <div ref={bottomRef} />
       </div>
 
-      <div className="absolute top-0 left-0 right-0 z-20 p-2 bg-linear-to-t from-transparent via-white/90 to-white">
+      <div className="absolute top-0 left-0 right-0 z-20 p-2 bg-linear-to-t from-transparent via-white/90 dark:via-black/90 to-white dark:to-black/90">
         <div className="flex justify-between pl-3 items-center">
           <h2 className="text-lg font-semibold">{agentDetails?.name || "Agent"}</h2>
           <AlertDialog>
@@ -370,9 +370,9 @@ export default function ChatUI({
         </div>
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 z-20  p-2 bg-linear-to-t from-white via-white/30 to-transparent">
+      <div className="absolute bottom-0 left-0 right-0 z-20  p-2 bg-linear-to-t from-background via-background/30 to-transparent">
         <div className="w-full max-w-2xl mx-auto">
-          <div className="relative p-[2px] gap-2 bg-white border border-gray-300 rounded-4xl">
+          <div className="relative min-h-[42px] bg-white dark:bg-gray-800 gap-2 border border-border overflow-hidden rounded-4xl">
             <Textarea
               value={input}
               disabled={isStreaming}
@@ -388,7 +388,7 @@ export default function ChatUI({
               }}
               placeholder="Type your message..."
               rows={1}
-              className="flex-1 resize-none border-none px-4 pr-10 w-full shadow-none focus-visible:ring-0 bg-transparent text-sm leading-5 max-h-32 overflow-y-auto"
+              className="flex-1 resize-none border-none px-4 pr-10 w-full h-full bg-white dark:bg-gray-800 shadow-none focus-visible:ring-0 text-sm leading-5 max-h-32 overflow-y-auto"
             />
 
             <Button

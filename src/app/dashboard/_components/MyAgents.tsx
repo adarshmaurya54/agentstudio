@@ -142,7 +142,7 @@ function MyAgents() {
               <div className='group relative' key={agent.agentId}>
                 <Link href={`/agent-builder/${agent.agentId}`} className='border h-full rounded-2xl p-2 flex items-start flex-col justify-between'>
                   <div className='space-y-3'>
-                    <Bot className='bg-purple-100 p-2 h-8 w-8 rounded-md' />
+                    <Bot className='bg-purple-300 dark:bg-purple-900 p-2 h-8 w-8 rounded-md' />
                     <h2 className='text-xl font-bold'>{agent.name}</h2>
                   </div>
 
@@ -153,7 +153,7 @@ function MyAgents() {
                 <Dialog>
                   <DialogTrigger asChild>
                     <button>
-                      <Trash2Icon className='bg-gray-100 hidden group-hover:flex hover:bg-gray-200 absolute top-2 right-2 p-2 h-8 w-8 rounded-md' />
+                      <Trash2Icon className='bg-gray-100 dark:bg-gray-700 hidden group-hover:flex hover:bg-gray-200 absolute top-2 right-2 p-2 h-8 w-8 rounded-md' />
                     </button>
                   </DialogTrigger>
 
@@ -187,7 +187,7 @@ function MyAgents() {
                     setIsDialogOpen(true);
                   }}
                 >
-                  <PencilIcon className='bg-gray-100 hidden group-hover:flex hover:bg-gray-200 absolute top-11 right-2 p-2 h-8 w-8 rounded-md' />
+                  <PencilIcon className='bg-gray-100 dark:bg-gray-700  hidden group-hover:flex hover:bg-gray-200 absolute top-11 right-2 p-2 h-8 w-8 rounded-md' />
                 </button>
                 <DottedGlowBackground
                   className="pointer-events-none mask-radial-to-90% mask-radial-at-center"

@@ -24,6 +24,7 @@ import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { useUser, SignOutButton } from '@clerk/nextjs'
 import { LiquidGlassCard } from './ui/liquid-glass'
+import { ThemeSwitcher } from './ThemeSwitcher'
 
 function Navbar() {
   const [isTop, setIsTop] = useState(true)
@@ -48,12 +49,15 @@ function Navbar() {
             <Image src="/logo.svg" alt="AgentStudio logo" width={30} height={30} />
             <span className="text-sm font-semibold sm:text-base">AgentStudio</span>
           </Link>
-          <Button asChild size="sm">
-            <Link href="/dashboard" className="bg-[#8b5cf6] rounded-full text-white hover:bg-[#7c3aed]">
-              Get Started
-              <ArrowRight className="size-4" />
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <ThemeSwitcher />
+            <Button asChild size="sm">
+              <Link href="/dashboard" className="bg-[#8b5cf6] rounded-full text-white hover:bg-[#7c3aed]">
+                Get Started
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+          </div>
         </div>
       {/* </nav> */}
     </LiquidGlassCard>
