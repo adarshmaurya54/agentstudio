@@ -27,4 +27,10 @@ export default defineSchema({
     })
         .index("by_conversationId_and_agentId_and_userId", ["conversationId", "agentId", "userId"])
         .index("by_agentId_and_userId", ["agentId", "userId"]),
+    TestApiTable: defineTable({
+        id: v.string(),
+        name: v.string(),
+        description: v.string(),
+        source: v.string(),
+    }).index("by_source", ["source"]),
 })
