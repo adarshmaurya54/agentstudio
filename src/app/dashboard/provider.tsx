@@ -9,7 +9,7 @@ function DashboardProvider({ children }: any) {
             <AppSidebar />
             <div className='w-full bg-sidebar h-screen'>
                 <AppHeader />
-                <div className="bg-sidebar flex items-center justify-center h-[90%] md:py-3 md:pr-3 pr-2 md:ps-0 ps-2">
+                <div className="bg-sidebar flex items-center justify-center h-[90%] md:pb-3 md:pr-3 pr-2 md:ps-0 ps-2">
                     <div className='bg-card rounded-2xl overflow-hidden border w-full h-full'>
                         <div className="overflow-y-auto h-full">
                             {children}
