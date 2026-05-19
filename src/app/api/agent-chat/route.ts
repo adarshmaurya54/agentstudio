@@ -11,6 +11,8 @@ const SUMMARY_TRIGGER_MESSAGES = 60;
 const MAX_SUMMARY_SOURCE_MESSAGES = 300;
 const MAX_SUMMARY_CHARS = 2000;
 const MAX_INPUT_LENGTH = 4000;
+const MODEL_TIMEOUT_MS = 60000;
+const TOOL_TIMEOUT_MS = 25000;
 const FALLBACK_MODELS = [
   "openrouter/free",
   "deepseek/deepseek-chat",
@@ -119,19 +121,23 @@ async function persistMessage(context: MemoryContext, message: ChatMessage): Pro
 }
 
 async function callModel(messages: ChatMessage[], model?: string): Promise<string> {
-  const res = await fetch(OPENROUTER_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      "Content-Type": "application/json",
+  const res = await fetchWithTimeout(
+    OPENROUTER_URL,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: model || DEFAULT_MODEL,
+        messages,
+        temperature: 0,
+        stream: false,
+      }),
     },
-    body: JSON.stringify({
-      model: model || DEFAULT_MODEL,
-      messages,
-      temperature: 0,
-      stream: false,
-    }),
-  });
+    MODEL_TIMEOUT_MS,
+  );
 
   if (!res.ok) {
     throw new Error(`Model call failed (${res.status} ${res.statusText})`);
@@ -142,19 +148,23 @@ async function callModel(messages: ChatMessage[], model?: string): Promise<strin
 }
 
 async function callModelStream(messages: ChatMessage[], model?: string): Promise<Response> {
-  const res = await fetch(OPENROUTER_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      "Content-Type": "application/json",
+  const res = await fetchWithTimeout(
+    OPENROUTER_URL,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: model || DEFAULT_MODEL,
+        messages,
+        temperature: 0,
+        stream: true,
+      }),
     },
-    body: JSON.stringify({
-      model: model || DEFAULT_MODEL,
-      messages,
-      temperature: 0,
-      stream: true,
-    }),
-  });
+    MODEL_TIMEOUT_MS,
+  );
 
   if (!res.ok) {
     throw new Error(`Model stream failed (${res.status} ${res.statusText})`);
@@ -165,6 +175,27 @@ async function callModelStream(messages: ChatMessage[], model?: string): Promise
 
 function safeText(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+function normalizeKey(value: unknown): string {
+  return safeText(value).trim().toLowerCase();
+}
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function resolveModel(model: string): string {
@@ -228,10 +259,11 @@ async function callModelStreamWithFallback(
 }
 
 function normalizeToolsForAgent(tools: Tool[], agent: AgentConfig): Tool[] {
-  const agentId = safeText(agent.id);
-  const agentName = safeText(agent.name);
+  const agentId = normalizeKey(agent.id);
+  const agentName = normalizeKey(agent.name);
   return tools.filter((tool) => {
-    const assigned = safeText(tool.assignedAgent);
+    const assigned = normalizeKey(tool.assignedAgent);
+    if (!assigned) return true;
     return assigned === agentId || assigned === agentName;
   });
 }
@@ -360,7 +392,7 @@ async function executeTool(tool: Tool, params: Record<string, unknown>): Promise
     requestInit.body = JSON.stringify(params);
   }
 
-  const res = await fetch(url, requestInit);
+  const res = await fetchWithTimeout(url, requestInit, TOOL_TIMEOUT_MS);
   if (!res.ok) {
     throw new Error(`Tool request failed (${res.status} ${res.statusText})`);
   }
